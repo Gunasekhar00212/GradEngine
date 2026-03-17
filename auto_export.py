@@ -12,6 +12,7 @@ from typing import Dict, Iterable, Tuple
 
 DEFAULT_OUTPUT = "PROJECT_CODE_EXPORT.md"
 IGNORED_DIRS = {
+    "data",
     ".git",
     "__pycache__",
     ".pytest_cache",
@@ -19,6 +20,23 @@ IGNORED_DIRS = {
     ".venv",
     "venv",
     "node_modules",
+}
+
+EXCLUDED_FILES = {
+    ".env",
+    ".gitignore",
+}
+
+INCLUDED_SUFFIXES = {
+    ".py",
+    ".md",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".txt",
+    ".sh",
 }
 
 LANGUAGE_BY_SUFFIX = {
@@ -44,7 +62,9 @@ def iter_project_files(root: Path, output_file: str) -> Iterable[Tuple[str, Path
         for filename in sorted(filenames):
             abs_path = Path(dirpath) / filename
             rel_path = abs_path.relative_to(root).as_posix()
-            if rel_path in excluded_files:
+            if rel_path in excluded_files or filename in EXCLUDED_FILES:
+                continue
+            if abs_path.suffix.lower() not in INCLUDED_SUFFIXES:
                 continue
             yield rel_path, abs_path
 
@@ -65,7 +85,7 @@ def build_export(root: Path, output_file: str) -> str:
     lines = [
         "# GradEngine Code Export",
         "",
-        "This document contains the full contents of every file in the project.",
+        "This document contains the full contents of code and config files only.",
         "",
     ]
 
