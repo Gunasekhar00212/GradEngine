@@ -9,6 +9,7 @@ import os
 import json
 from dotenv import load_dotenv
 from google import genai
+import re
 
 from processing.pdf_split import pdf_to_images
 from processing.extract_text import extract_text
@@ -67,14 +68,32 @@ def main():
         json.dump(all_pages_text, f, indent=4)
 
     print("\nStep 3: Generating embeddings...")
-    answer_vec = get_embedding(full_text)
+    sentences = re.split(r'[.\n]', full_text)# normalize full text
+    def normalize(text):
+        text = text.lower()
+        text = re.sub(r'[^a-z0-9\s]', '', text)
+        return text
+
+    normalized_text = normalize(full_text)
+
+    sentences = [s.strip() for s in sentences if s.strip()]
+    sentences_vec = [get_embedding(s) for s in sentences]
+
+    expanded_rubric = {
+    "sunlight": ["sunlight", "light energy"],
+    "CO2": ["CO2", "carbon dioxide"],
+    "water": ["water", "H2O"],
+    "oxygen": ["oxygen", "O2"],
+    "glucose": ["glucose", "sugar"]
+    }
 
     rubric_vectors = {}
-    for concept in rubric:
-        rubric_vectors[concept] = get_embedding(concept)
+    for concept, variations in expanded_rubric.items():
+
+        rubric_vectors[concept] = [get_embedding(v) for v in variations]
 
     print("Step 4: Scoring...")
-    score, detected = score_answer(answer_vec, rubric_vectors)
+    score, detected = score_answer(sentences_vec, rubric_vectors, normalized_text)
 
     print("\nDetected Concepts:", detected)
     print("Final Score:", score, "/", len(rubric))
@@ -192,14 +211,26 @@ def get_embedding(text):
 ```python
 from sklearn.metrics.pairwise import cosine_similarity
 
-def score_answer(answer_vec, rubric_vectors):
+def score_answer(sentence_vectors, rubric_vectors, normalized_text):
     score = 0
     detected = []
 
-    for concept, vec in rubric_vectors.items():
-        sim = cosine_similarity([answer_vec], [vec])[0][0]
+    for concept, vec_list in rubric_vectors.items():
 
-        if sim > 0.8:
+        # ---------- KEYWORD MATCH ----------
+        keyword_hit = concept.lower() in normalized_text
+
+        # ---------- EMBEDDING MATCH ----------
+        best_sim = 0
+        for s_vec in sentence_vectors:
+            for r_vec in vec_list:
+                sim = cosine_similarity([s_vec], [r_vec])[0][0]
+                best_sim = max(best_sim, sim)
+
+        print(f"{concept} → sim: {best_sim:.2f}, keyword: {keyword_hit}")
+
+        # ---------- FINAL DECISION ----------
+        if keyword_hit or best_sim > 0.6:
             score += 1
             detected.append(concept)
 
