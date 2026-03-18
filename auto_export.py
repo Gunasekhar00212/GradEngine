@@ -27,6 +27,10 @@ EXCLUDED_FILES = {
     ".gitignore",
 }
 
+EXCLUDED_BASENAMES = {
+    "readme.md",
+}
+
 INCLUDED_SUFFIXES = {
     ".py",
     ".md",
@@ -63,6 +67,8 @@ def iter_project_files(root: Path, output_file: str) -> Iterable[Tuple[str, Path
             abs_path = Path(dirpath) / filename
             rel_path = abs_path.relative_to(root).as_posix()
             if rel_path in excluded_files or filename in EXCLUDED_FILES:
+                continue
+            if filename.lower() in EXCLUDED_BASENAMES:
                 continue
             if abs_path.suffix.lower() not in INCLUDED_SUFFIXES:
                 continue

@@ -85,6 +85,19 @@ if __name__ == "__main__":
 
 ```
 
+## ./requirements.txt
+
+```text
+google-genai
+python-dotenv
+pdf2image
+Pillow
+sentence-transformers
+scikit-learn
+numpy
+
+```
+
 ## ./processing/extract_text.py
 
 ```python
