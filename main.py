@@ -73,18 +73,62 @@ def main():
     sentences_vec = [get_embedding(s) for s in sentences]
 
     expanded_rubric = {
-    "sunlight": ["sunlight", "light energy"],
-    "CO2": ["CO2", "carbon dioxide"],
-    "water": ["water", "H2O"],
-    "oxygen": ["oxygen", "O2"],
-    "glucose": ["glucose", "sugar"]
+    "sunlight": {
+        "keywords": ["sunlight", "light energy"],
+        "explanations": [
+            "sunlight provides energy for photosynthesis",
+            "plants use sunlight for energy"
+        ],
+        "marks": 1
+    },
+    "CO2": {
+        "keywords": ["CO2", "carbon dioxide"],
+        "explanations": [
+            "CO2 is used to produce glucose",
+            "plants take carbon dioxide to make food"
+        ],
+        "marks": 1
+    },
+    "water": {
+        "keywords": ["water", "H2O"],
+        "explanations": [
+            "water is used in photosynthesis",
+            "plants absorb water for photosynthesis"
+        ],
+        "marks": 1
+    },
+    "oxygen": {
+        "keywords": ["oxygen", "O2"],
+        "explanations": [
+            "oxygen is released as byproduct",
+            "oxygen is produced during photosynthesis",
+            "plants produce oxygen"
+        ],
+        "marks": 1
+    },
+    "glucose": {
+        "keywords": ["glucose", "sugar"],
+        "explanations": [
+            "glucose is produced as food",
+            "plants make glucose"
+        ],
+        "marks": 1
     }
+}
 
     rubric_vectors = {}
-    for concept, variations in expanded_rubric.items():
 
-        rubric_vectors[concept] = [get_embedding(v) for v in variations]
-
+    for concept, data in expanded_rubric.items():
+        keyword_vecs = [get_embedding(k) for k in data["keywords"]]
+        explanation_vecs = [get_embedding(e) for e in data["explanations"]]  # Use the first explanation for now
+    
+        rubric_vectors[concept] = {
+            "keywords": data["keywords"],
+            "keyword_vecs": keyword_vecs,
+            "explanation_vecs": explanation_vecs,
+            "marks": data["marks"]
+        }
+    
     print("Step 4: Scoring...")
     score, detected = score_answer(sentences_vec, rubric_vectors, normalized_text)
 
