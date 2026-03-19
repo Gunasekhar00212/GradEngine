@@ -79,49 +79,12 @@ def main():
     sentences = [s.strip() for s in sentences if s.strip()]
     sentences_vec = [get_embedding(s) for s in sentences]
 
-    expanded_rubric = {
-    "sunlight": {
-        "keywords": ["sunlight", "light energy"],
-        "explanations": [
-            "sunlight provides energy for photosynthesis",
-            "plants use sunlight for energy"
-        ],
-        "marks": 1
-    },
-    "CO2": {
-        "keywords": ["CO2", "carbon dioxide"],
-        "explanations": [
-            "CO2 is used to produce glucose",
-            "plants take carbon dioxide to make food"
-        ],
-        "marks": 1
-    },
-    "water": {
-        "keywords": ["water", "H2O"],
-        "explanations": [
-            "water is used in photosynthesis",
-            "plants absorb water for photosynthesis"
-        ],
-        "marks": 1
-    },
-    "oxygen": {
-        "keywords": ["oxygen", "O2"],
-        "explanations": [
-            "oxygen is released as byproduct",
-            "oxygen is produced during photosynthesis",
-            "plants produce oxygen"
-        ],
-        "marks": 1
-    },
-    "glucose": {
-        "keywords": ["glucose", "sugar"],
-        "explanations": [
-            "glucose is produced as food",
-            "plants make glucose"
-        ],
-        "marks": 1
-    }
-}
+    with open("rubric/expanded_rubric.json", "r") as f:
+        data = json.load(f)
+        QUESTION = data["question"]
+        expanded_rubric = data["concepts"]
+
+    question_vec = get_embedding(QUESTION)
 
     rubric_vectors = {}
 
@@ -137,7 +100,12 @@ def main():
         }
     
     print("Step 4: Scoring...")
-    score, detected = score_answer(sentences_vec, rubric_vectors, normalized_text)
+    score, detected = score_answer(
+                                sentences_vec, 
+                                rubric_vectors, 
+                                normalized_text,
+                                question_vec
+                               )
 
     print("\nDetected Concepts:", detected)
     print("Final Score:", score, "/", len(rubric))
@@ -223,16 +191,54 @@ def pdf_to_images(pdf_path, output_folder="data/pages"):
 
 ```
 
-## ./rubric/rubric.json
+## ./rubric/expanded_rubric.json
 
 ```json
 {
-  "Q1": {
-    "sunlight": 1,
-    "CO2": 1,
-    "water": 1,
-    "oxygen": 1,
-    "glucose": 1
+  "question": "Explain photosynthesis",
+
+  "concepts": {
+    "sunlight": {
+      "keywords": ["sunlight", "light energy"],
+      "explanations": [
+        "sunlight provides energy for photosynthesis",
+        "plants use sunlight for energy"
+      ],
+      "marks": 1
+    },
+    "CO2": {
+      "keywords": ["CO2", "carbon dioxide"],
+      "explanations": [
+        "CO2 is used to produce glucose",
+        "plants take carbon dioxide to make food"
+      ],
+      "marks": 1
+    },
+    "water": {
+      "keywords": ["water", "H2O"],
+      "explanations": [
+        "water is used in photosynthesis",
+        "plants absorb water for photosynthesis"
+      ],
+      "marks": 1
+    },
+    "oxygen": {
+      "keywords": ["oxygen", "O2"],
+      "explanations": [
+        "oxygen is released as byproduct",
+        "oxygen is produced during photosynthesis",
+        "plants produce oxygen"
+      ],
+      "marks": 1
+    },
+    "glucose": {
+      "keywords": ["glucose", "sugar"],
+      "explanations": [
+        "glucose is produced as food",
+        "plants make glucose"
+      ],
+      "marks": 1
+    }
   }
 }
 
@@ -255,8 +261,9 @@ def get_embedding(text):
 ```python
 from sklearn.metrics.pairwise import cosine_similarity
 
-def score_answer(sentence_vectors, rubric_vectors, normalized_text):
+def score_answer(sentence_vectors, rubric_vectors, normalized_text, question_vec):
     total_score = 0
+    best_relevance = 0
     detected = []
 
     for concept, data in rubric_vectors.items():
@@ -282,19 +289,26 @@ def score_answer(sentence_vectors, rubric_vectors, normalized_text):
                 expl_sim = cosine_similarity([s_vec], [e_vec])[0][0]
                 best_expl_sim = max(best_expl_sim, expl_sim)
 
+        rel_sim = cosine_similarity([s_vec], [question_vec])[0][0]
+        best_relevance = max(best_relevance, rel_sim)
+
         print(f"{concept} → keyword_hit: {keyword_hit}, "
-              f"kw_sim: {best_keyword_sim:.2f}, expl_sim: {best_expl_sim:.2f}")
+            f"kw_sim: {best_keyword_sim:.2f}, "
+            f"expl_sim: {best_expl_sim:.2f}, "
+            f"rel_sim: {best_relevance:.2f}")
 
         # ---------- PARTIAL SCORING ----------
         concept_score = 0
 
-        # mention
-        if keyword_hit or best_keyword_sim > 0.6:
-            concept_score += 0.5
+        RELEVANCE_THRESHOLD = 0.5
 
-        # explanation
-        if best_expl_sim > 0.6:
-            concept_score += 0.5
+        if best_relevance > RELEVANCE_THRESHOLD:
+        
+            if keyword_hit or best_keyword_sim > 0.6:
+                concept_score += 0.5
+        
+            if best_expl_sim > 0.6:
+                concept_score += 0.5
 
         if concept_score > 0:
             detected.append(concept)
