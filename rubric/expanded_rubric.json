@@ -1,0 +1,47 @@
+{
+  "question": "Explain photosynthesis",
+
+  "concepts": {
+    "sunlight": {
+      "keywords": ["sunlight", "light energy"],
+      "explanations": [
+        "sunlight provides energy for photosynthesis",
+        "plants use sunlight for energy"
+      ],
+      "marks": 1
+    },
+    "CO2": {
+      "keywords": ["CO2", "carbon dioxide"],
+      "explanations": [
+        "CO2 is used to produce glucose",
+        "plants take carbon dioxide to make food"
+      ],
+      "marks": 1
+    },
+    "water": {
+      "keywords": ["water", "H2O"],
+      "explanations": [
+        "water is used in photosynthesis",
+        "plants absorb water for photosynthesis"
+      ],
+      "marks": 1
+    },
+    "oxygen": {
+      "keywords": ["oxygen", "O2"],
+      "explanations": [
+        "oxygen is released as byproduct",
+        "oxygen is produced during photosynthesis",
+        "plants produce oxygen"
+      ],
+      "marks": 1
+    },
+    "glucose": {
+      "keywords": ["glucose", "sugar"],
+      "explanations": [
+        "glucose is produced as food",
+        "plants make glucose"
+      ],
+      "marks": 1
+    }
+  }
+}

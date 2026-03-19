@@ -72,49 +72,12 @@ def main():
     sentences = [s.strip() for s in sentences if s.strip()]
     sentences_vec = [get_embedding(s) for s in sentences]
 
-    expanded_rubric = {
-    "sunlight": {
-        "keywords": ["sunlight", "light energy"],
-        "explanations": [
-            "sunlight provides energy for photosynthesis",
-            "plants use sunlight for energy"
-        ],
-        "marks": 1
-    },
-    "CO2": {
-        "keywords": ["CO2", "carbon dioxide"],
-        "explanations": [
-            "CO2 is used to produce glucose",
-            "plants take carbon dioxide to make food"
-        ],
-        "marks": 1
-    },
-    "water": {
-        "keywords": ["water", "H2O"],
-        "explanations": [
-            "water is used in photosynthesis",
-            "plants absorb water for photosynthesis"
-        ],
-        "marks": 1
-    },
-    "oxygen": {
-        "keywords": ["oxygen", "O2"],
-        "explanations": [
-            "oxygen is released as byproduct",
-            "oxygen is produced during photosynthesis",
-            "plants produce oxygen"
-        ],
-        "marks": 1
-    },
-    "glucose": {
-        "keywords": ["glucose", "sugar"],
-        "explanations": [
-            "glucose is produced as food",
-            "plants make glucose"
-        ],
-        "marks": 1
-    }
-}
+    with open("rubric/expanded_rubric.json", "r") as f:
+        data = json.load(f)
+        QUESTION = data["question"]
+        expanded_rubric = data["concepts"]
+
+    question_vec = get_embedding(QUESTION)
 
     rubric_vectors = {}
 
@@ -130,7 +93,12 @@ def main():
         }
     
     print("Step 4: Scoring...")
-    score, detected = score_answer(sentences_vec, rubric_vectors, normalized_text)
+    score, detected = score_answer(
+                                sentences_vec, 
+                                rubric_vectors, 
+                                normalized_text,
+                                question_vec
+                               )
 
     print("\nDetected Concepts:", detected)
     print("Final Score:", score, "/", len(rubric))
