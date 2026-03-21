@@ -1,0 +1,25 @@
+GradEngine/
+├── config/
+│   └── settings.py
+├── data/
+│   ├── input/
+│   │   └── handwritten_test.pdf
+│   ├── pages/
+│   │   ├── page_0.jpg
+│   │   └── page_0.png
+│   ├── extracted_text/
+│   │   └── output.json
+│   └── rubric/
+│       └── expanded_rubric.json
+├── processing/
+│   ├── clean_text.py
+│   ├── extract_text.py
+│   └── pdf_split.py
+├── scoring/
+│   ├── embedding.py
+│   └── scoring_engine.py
+├── .env
+├── .gitignore
+├── main.py
+├── README.md
+└── requirements.txt
