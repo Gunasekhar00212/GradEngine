@@ -38,122 +38,232 @@ GradEngine/
 ```python
 import os
 import json
-from dotenv import load_dotenv
-from google import genai
 import re
+from dotenv import load_dotenv
+
+from config.settings import (
+    PDF_PATH,
+    IMAGE_OUTPUT_DIR,
+    EXTRACTED_TEXT_PATH,
+    BLUEPRINT_PATH,
+    VALID_SHORT_WORDS,
+    DEBUG,
+)
 
 from processing.pdf_split import pdf_to_images
 from processing.extract_text import extract_text
+from processing.clean_text import clean_text
 from scoring.embedding import get_embedding
 from scoring.scoring_engine import score_answer
-from processing.clean_text import clean_text
-# -----------------------
-# Load API Key
-# -----------------------
-load_dotenv()
 
-# -----------------------
-# Hardcoded inputs
-# -----------------------
-PDF_PATH = "data/input/handwritten_test.pdf"
 
-rubric = {
-    "sunlight": 1,
-    "CO2": 1,
-    "water": 1,
-    "oxygen": 1,
-    "glucose": 1
-}
+def normalize_text(text):
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    return text
 
-# -----------------------
-# MAIN
-# -----------------------
-def main():
-    print("Step 1: Converting PDF to images...")
-    pages = pdf_to_images(PDF_PATH)
 
-    print("Step 2: Extracting text...")
-    
+def filter_short_tokens(text, valid_short_words):
+    words = [
+        word for word in text.split()
+        if len(word) > 2 or word in valid_short_words
+    ]
+    return " ".join(words)
+
+
+def load_blueprint(path):
+    with open(path, "r") as f:
+        data = json.load(f)
+    return data["question"], data["concepts"]
+
+
+def extract_pages_text(page_paths, api_key):
     full_text = ""
     all_pages_text = []
 
-    for i, page in enumerate(pages):
-        api_key = os.getenv("GOOGLE_API_KEY")
+    for i, page_path in enumerate(page_paths):
+        text = extract_text(page_path, api_key)
 
-        text = extract_text(page,api_key)
+        if DEBUG:
+            print(f"\nPage {i} Text:\n{text}\n")
 
-        print(f"\nPage {i} Text:\n{text}\n")
-
-        # store page-wise
-        data = {
+        all_pages_text.append({
             "page": i,
             "text": text
-        }
-
-        all_pages_text.append(data)
+        })
 
         full_text += " " + text
 
-    # save after loop
-    with open("data/extracted_text/output.json", "w") as f:
+    return full_text.strip(), all_pages_text
+
+
+def save_extracted_text(all_pages_text, output_path):
+    with open(output_path, "w") as f:
         json.dump(all_pages_text, f, indent=4)
 
-    print("\nStep 3: Generating embeddings...")
-    sentences = re.split(r'[.\n]', full_text)# normalize full text
-    def normalize(text):
-        text = text.lower()
-        text = re.sub(r'[^a-z0-9\s]', '', text)
-        return text
-    cleaned_text = clean_text(full_text)
-    normalized_text = normalize(cleaned_text)
-    print("\n--- CLEANED TEXT ---\n", cleaned_text)
-    print("\n--- NORMALIZED TEXT ---\n", normalized_text)
-    # remove small noisy tokens
-    valid_short_words = {"co2", "o2", "h2o"}
 
-    words = [
-        w for w in normalized_text.split()
-        if len(w) > 2 or w in valid_short_words
-    ]
-
-    normalized_text = " ".join(words)    
+def prepare_sentence_vectors(full_text):
+    sentences = re.split(r'[.\n]', full_text)
     sentences = [s.strip() for s in sentences if s.strip()]
-    sentences_vec = [get_embedding(s) for s in sentences]
+    sentence_vectors = [get_embedding(sentence) for sentence in sentences]
+    return sentence_vectors
 
-    with open("data/rubric/expanded_rubric.json", "r") as f:
-        data = json.load(f)
-        QUESTION = data["question"]
-        expanded_rubric = data["concepts"]
 
-    question_vec = get_embedding(QUESTION)
-
+def build_rubric_vectors(expanded_rubric):
     rubric_vectors = {}
 
-    for concept, data in expanded_rubric.items():
-        keyword_vecs = [get_embedding(k) for k in data["keywords"]]
-        explanation_vecs = [get_embedding(e) for e in data["explanations"]]  # Use the first explanation for now
-    
+    for concept, concept_data in expanded_rubric.items():
+        keyword_vecs = [get_embedding(k) for k in concept_data["keywords"]]
+        explanation_vecs = [get_embedding(e) for e in concept_data["explanations"]]
+
         rubric_vectors[concept] = {
-            "keywords": data["keywords"],
+            "keywords": concept_data["keywords"],
             "keyword_vecs": keyword_vecs,
             "explanation_vecs": explanation_vecs,
-            "marks": data["marks"]
+            "marks": concept_data["marks"]
         }
-    
+
+    return rubric_vectors
+
+
+def main():
+    load_dotenv()
+    api_key = os.getenv("GOOGLE_API_KEY")
+
+    print("Step 1: Converting PDF to images...")
+    page_paths = pdf_to_images(PDF_PATH, IMAGE_OUTPUT_DIR)
+
+    print("Step 2: Extracting text...")
+    full_text, all_pages_text = extract_pages_text(page_paths, api_key)
+    save_extracted_text(all_pages_text, EXTRACTED_TEXT_PATH)
+
+    print("\nStep 3: Generating embeddings...")
+    cleaned_text = clean_text(full_text)
+    normalized_text = normalize_text(cleaned_text)
+    normalized_text = filter_short_tokens(normalized_text, VALID_SHORT_WORDS)
+
+    if DEBUG:
+        print("\n--- CLEANED TEXT ---\n", cleaned_text)
+        print("\n--- NORMALIZED TEXT ---\n", normalized_text)
+
+    sentence_vectors = prepare_sentence_vectors(full_text)
+
+    question, expanded_rubric = load_blueprint(BLUEPRINT_PATH)
+    question_vec = get_embedding(question)
+    rubric_vectors = build_rubric_vectors(expanded_rubric)
+
     print("Step 4: Scoring...")
     score, detected = score_answer(
-                                sentences_vec, 
-                                rubric_vectors, 
-                                normalized_text,
-                                question_vec
-                               )
+        sentence_vectors,
+        rubric_vectors,
+        normalized_text,
+        question_vec
+    )
+
+    total_marks = sum(item["marks"] for item in expanded_rubric.values())
 
     print("\nDetected Concepts:", detected)
-    print("Final Score:", score, "/", len(rubric))
+    print("Final Score:", score, "/", total_marks)
 
 
 if __name__ == "__main__":
     main()
+
+```
+
+## ./plan_checklist.txt
+
+```text
+GradEngine Roadmap Checklist (Reality-First)
+
+How to use:
+[ ] = pending
+[x] = done
+
+PHASE 1 - Foundation Prototype (Done)
+[x] OCR pipeline implemented
+[x] Text cleaning implemented
+[x] Scoring engine implemented
+[x] Rubric-based evaluation implemented
+[x] Single-answer prototype completed
+
+PHASE 2 - Real Data Collection and Reality Validation (Current Priority)
+Goal: Validate assumptions with actual exam material before new intelligence/features.
+
+Data Collection
+[ ] Collect real question papers (multi-subject if possible)
+[ ] Collect real student answer booklet samples
+[ ] Collect real blueprint/rubric patterns (if available)
+[ ] Apply anonymization/privacy checks to all collected data
+[ ] Catalog each sample with metadata (subject, grade, handwriting type, pages)
+
+Reality Analysis
+[ ] Analyze answer length patterns (short/medium/long per question type)
+[ ] Analyze teacher marking patterns (strictness, partial credit behavior)
+[ ] Analyze question distribution (question types and frequency)
+[ ] Analyze how students continue answers across pages
+[ ] Analyze real question-numbering styles in booklets
+[ ] Identify OCR failure cases for real handwriting
+[ ] Build failure taxonomy (e.g., merged lines, missed numbers, symbol confusion)
+
+Phase 2 Deliverables
+[ ] Produce Reality Validation Report
+[ ] Produce segmentation requirements derived from real data
+[ ] Produce scoring-upgrade requirements derived from real marking behavior
+[ ] Approve Phase 2 gate before starting Phase 3
+
+PHASE 3 - Question-Wise Segmentation and Mapping
+Goal: Build segmentation based on validated patterns from Phase 2.
+
+Build
+[ ] Implement question boundary detection based on real numbering styles
+[ ] Implement continuation detection for answers spanning multiple pages
+[ ] Implement answer-to-question mapping using validated layout patterns
+[ ] Handle ambiguous numbering/layout cases with fallback logic
+
+Validation
+[ ] Evaluate segmentation on held-out real booklets
+[ ] Measure mapping accuracy by numbering style
+[ ] Log unresolved/ambiguous mappings for rule refinement
+[ ] Approve Phase 3 gate before starting Phase 4
+
+PHASE 4 - Advanced Evaluation Intelligence
+Goal: Improve scoring quality using real data and teacher marking behavior.
+
+Scoring Enhancements
+[ ] Add completeness scoring
+[ ] Add depth/coverage scoring
+[ ] Add expected answer-length calibration
+[ ] Add irrelevance penalty
+[ ] Add answer structure quality scoring
+
+Validation
+[ ] Compare model scores vs teacher marks
+[ ] Measure agreement/correlation metrics
+[ ] Perform per-criterion error analysis
+[ ] Refine thresholds/rules based on observed gaps
+[ ] Approve Phase 4 gate before starting Phase 5
+
+PHASE 5 - Systemization / Product Layer
+Goal: Turn validated pipeline into a usable system/demo.
+
+Productization
+[ ] Add batch processing workflow
+[ ] Add report generation (student/question level)
+[ ] Build dashboard/UI
+[ ] Prepare deployment/demo packaging
+[ ] Add operational monitoring/logging hooks
+
+Release Readiness
+[ ] Run end-to-end demo with multi-booklet batch
+[ ] Verify outputs for technical and non-technical stakeholders
+[ ] Finalize roadmap closure and next-cycle backlog
+
+Cross-Phase Control Checklist
+[ ] Do not start Phase 3 before Phase 2 validation is signed off
+[ ] Do not start Phase 4 before Phase 3 validation is signed off
+[ ] Do not start Phase 5 before Phase 4 validation is signed off
+[ ] Keep scope reality-driven (avoid assumption-driven features)
 
 ```
 
@@ -399,64 +509,80 @@ def get_embedding(text):
 ## ./scoring/scoring_engine.py
 
 ```python
+from difflib import SequenceMatcher
 from sklearn.metrics.pairwise import cosine_similarity
+
+from config.settings import (
+    RELEVANCE_THRESHOLD,
+    EXPLANATION_THRESHOLD,
+    KEYWORD_SIM_THRESHOLD,
+)
+
+
+def fuzzy_match(a, b):
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def get_best_similarity(sentence_vectors, target_vectors):
+    best_sim = 0
+
+    for s_vec in sentence_vectors:
+        for t_vec in target_vectors:
+            sim = cosine_similarity([s_vec], [t_vec])[0][0]
+            best_sim = max(best_sim, sim)
+
+    return best_sim
+
+
+def get_best_relevance(sentence_vectors, question_vec):
+    best_relevance = 0
+
+    for s_vec in sentence_vectors:
+        rel_sim = cosine_similarity([s_vec], [question_vec])[0][0]
+        best_relevance = max(best_relevance, rel_sim)
+
+    return best_relevance
+
+
+def has_keyword_hit(keywords, normalized_text):
+    words = normalized_text.split()
+
+    return any(
+        any(fuzzy_match(keyword.lower(), word) > 0.8 for word in words)
+        for keyword in keywords
+    )
+
 
 def score_answer(sentence_vectors, rubric_vectors, normalized_text, question_vec):
     total_score = 0
-    
     detected = []
 
     for concept, data in rubric_vectors.items():
-        
         keywords = data["keywords"]
         keyword_vecs = data["keyword_vecs"]
         explanation_vecs = data["explanation_vecs"]
         marks = data["marks"]
 
-        # ---------- KEYWORD MATCH ----------
-        from difflib import SequenceMatcher
+        keyword_hit = has_keyword_hit(keywords, normalized_text)
+        best_keyword_sim = get_best_similarity(sentence_vectors, keyword_vecs)
+        best_expl_sim = get_best_similarity(sentence_vectors, explanation_vecs)
+        best_relevance = get_best_relevance(sentence_vectors, question_vec)
 
-        def fuzzy_match(a, b):
-            return SequenceMatcher(None, a, b).ratio()
-        
-        keyword_hit = any(
-            any(fuzzy_match(k.lower(), word) > 0.8 for word in normalized_text.split())
-            for k in keywords
-        )
-
-        # ---------- BEST SENTENCE MATCH ----------
-        best_keyword_sim = 0
-        best_expl_sim = 0
-        best_relevance = 0
-        for s_vec in sentence_vectors:
-            for k_vec in keyword_vecs:
-                sim = cosine_similarity([s_vec], [k_vec])[0][0]
-                best_keyword_sim = max(best_keyword_sim, sim)
-
-            for e_vec in explanation_vecs:
-                expl_sim = cosine_similarity([s_vec], [e_vec])[0][0]
-                best_expl_sim = max(best_expl_sim, expl_sim)
-
-            rel_sim = cosine_similarity([s_vec], [question_vec])[0][0]
-            best_relevance = max(best_relevance, rel_sim)
-
-        print(f"{concept} → keyword_hit: {keyword_hit}, "
+        print(
+            f"{concept} → keyword_hit: {keyword_hit}, "
             f"kw_sim: {best_keyword_sim:.2f}, "
             f"expl_sim: {best_expl_sim:.2f}, "
-            f"rel_sim: {best_relevance:.2f}")
+            f"rel_sim: {best_relevance:.2f}"
+        )
 
-        # ---------- PARTIAL SCORING ----------
         concept_score = 0
 
-        RELEVANCE_THRESHOLD = 0.5
-
         if best_relevance > RELEVANCE_THRESHOLD:
-        
-            if keyword_hit or best_keyword_sim > 0.6:
-                concept_score += 0.5
+            if keyword_hit or best_keyword_sim > KEYWORD_SIM_THRESHOLD:
+                concept_score += marks * 0.5
 
-            if best_expl_sim > 0.6:
-                concept_score += 0.5
+            if best_expl_sim > EXPLANATION_THRESHOLD:
+                concept_score += marks * 0.5
 
         if concept_score > 0:
             detected.append(concept)

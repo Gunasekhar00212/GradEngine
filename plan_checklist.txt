@@ -1,0 +1,90 @@
+GradEngine Roadmap Checklist (Reality-First)
+
+How to use:
+[ ] = pending
+[x] = done
+
+PHASE 1 - Foundation Prototype (Done)
+[x] OCR pipeline implemented
+[x] Text cleaning implemented
+[x] Scoring engine implemented
+[x] Rubric-based evaluation implemented
+[x] Single-answer prototype completed
+
+PHASE 2 - Real Data Collection and Reality Validation (Current Priority)
+Goal: Validate assumptions with actual exam material before new intelligence/features.
+
+Data Collection
+[ ] Collect real question papers (multi-subject if possible)
+[ ] Collect real student answer booklet samples
+[ ] Collect real blueprint/rubric patterns (if available)
+[ ] Apply anonymization/privacy checks to all collected data
+[ ] Catalog each sample with metadata (subject, grade, handwriting type, pages)
+
+Reality Analysis
+[ ] Analyze answer length patterns (short/medium/long per question type)
+[ ] Analyze teacher marking patterns (strictness, partial credit behavior)
+[ ] Analyze question distribution (question types and frequency)
+[ ] Analyze how students continue answers across pages
+[ ] Analyze real question-numbering styles in booklets
+[ ] Identify OCR failure cases for real handwriting
+[ ] Build failure taxonomy (e.g., merged lines, missed numbers, symbol confusion)
+
+Phase 2 Deliverables
+[ ] Produce Reality Validation Report
+[ ] Produce segmentation requirements derived from real data
+[ ] Produce scoring-upgrade requirements derived from real marking behavior
+[ ] Approve Phase 2 gate before starting Phase 3
+
+PHASE 3 - Question-Wise Segmentation and Mapping
+Goal: Build segmentation based on validated patterns from Phase 2.
+
+Build
+[ ] Implement question boundary detection based on real numbering styles
+[ ] Implement continuation detection for answers spanning multiple pages
+[ ] Implement answer-to-question mapping using validated layout patterns
+[ ] Handle ambiguous numbering/layout cases with fallback logic
+
+Validation
+[ ] Evaluate segmentation on held-out real booklets
+[ ] Measure mapping accuracy by numbering style
+[ ] Log unresolved/ambiguous mappings for rule refinement
+[ ] Approve Phase 3 gate before starting Phase 4
+
+PHASE 4 - Advanced Evaluation Intelligence
+Goal: Improve scoring quality using real data and teacher marking behavior.
+
+Scoring Enhancements
+[ ] Add completeness scoring
+[ ] Add depth/coverage scoring
+[ ] Add expected answer-length calibration
+[ ] Add irrelevance penalty
+[ ] Add answer structure quality scoring
+
+Validation
+[ ] Compare model scores vs teacher marks
+[ ] Measure agreement/correlation metrics
+[ ] Perform per-criterion error analysis
+[ ] Refine thresholds/rules based on observed gaps
+[ ] Approve Phase 4 gate before starting Phase 5
+
+PHASE 5 - Systemization / Product Layer
+Goal: Turn validated pipeline into a usable system/demo.
+
+Productization
+[ ] Add batch processing workflow
+[ ] Add report generation (student/question level)
+[ ] Build dashboard/UI
+[ ] Prepare deployment/demo packaging
+[ ] Add operational monitoring/logging hooks
+
+Release Readiness
+[ ] Run end-to-end demo with multi-booklet batch
+[ ] Verify outputs for technical and non-technical stakeholders
+[ ] Finalize roadmap closure and next-cycle backlog
+
+Cross-Phase Control Checklist
+[ ] Do not start Phase 3 before Phase 2 validation is signed off
+[ ] Do not start Phase 4 before Phase 3 validation is signed off
+[ ] Do not start Phase 5 before Phase 4 validation is signed off
+[ ] Keep scope reality-driven (avoid assumption-driven features)
