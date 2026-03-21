@@ -1,107 +1,131 @@
 import os
 import json
-from dotenv import load_dotenv
-from google import genai
 import re
+from dotenv import load_dotenv
+
+from config.settings import (
+    PDF_PATH,
+    IMAGE_OUTPUT_DIR,
+    EXTRACTED_TEXT_PATH,
+    BLUEPRINT_PATH,
+    VALID_SHORT_WORDS,
+    DEBUG,
+)
 
 from processing.pdf_split import pdf_to_images
 from processing.extract_text import extract_text
+from processing.clean_text import clean_text
 from scoring.embedding import get_embedding
 from scoring.scoring_engine import score_answer
 
-# -----------------------
-# Load API Key
-# -----------------------
-load_dotenv()
 
-# -----------------------
-# Hardcoded inputs
-# -----------------------
-PDF_PATH = "data/pdfs/handwritten_test.pdf"
+def normalize_text(text):
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    return text
 
-rubric = {
-    "sunlight": 1,
-    "CO2": 1,
-    "water": 1,
-    "oxygen": 1,
-    "glucose": 1
-}
 
-# -----------------------
-# MAIN
-# -----------------------
-def main():
-    print("Step 1: Converting PDF to images...")
-    pages = pdf_to_images(PDF_PATH)
+def filter_short_tokens(text, valid_short_words):
+    words = [
+        word for word in text.split()
+        if len(word) > 2 or word in valid_short_words
+    ]
+    return " ".join(words)
 
-    print("Step 2: Extracting text...")
-    
+
+def load_blueprint(path):
+    with open(path, "r") as f:
+        data = json.load(f)
+    return data["question"], data["concepts"]
+
+
+def extract_pages_text(page_paths, api_key):
     full_text = ""
     all_pages_text = []
 
-    for i, page in enumerate(pages):
-        api_key = os.getenv("GOOGLE_API_KEY")
+    for i, page_path in enumerate(page_paths):
+        text = extract_text(page_path, api_key)
 
-        text = extract_text(page,api_key)
+        if DEBUG:
+            print(f"\nPage {i} Text:\n{text}\n")
 
-        print(f"\nPage {i} Text:\n{text}\n")
-
-        # store page-wise
-        data = {
+        all_pages_text.append({
             "page": i,
             "text": text
-        }
-
-        all_pages_text.append(data)
+        })
 
         full_text += " " + text
 
-    # save after loop
-    with open("data/extracted_text/output.json", "w") as f:
+    return full_text.strip(), all_pages_text
+
+
+def save_extracted_text(all_pages_text, output_path):
+    with open(output_path, "w") as f:
         json.dump(all_pages_text, f, indent=4)
 
-    print("\nStep 3: Generating embeddings...")
-    sentences = re.split(r'[.\n]', full_text)# normalize full text
-    def normalize(text):
-        text = text.lower()
-        text = re.sub(r'[^a-z0-9\s]', '', text)
-        return text
 
-    normalized_text = normalize(full_text)
-
+def prepare_sentence_vectors(full_text):
+    sentences = re.split(r'[.\n]', full_text)
     sentences = [s.strip() for s in sentences if s.strip()]
-    sentences_vec = [get_embedding(s) for s in sentences]
+    sentence_vectors = [get_embedding(sentence) for sentence in sentences]
+    return sentence_vectors
 
-    with open("rubric/expanded_rubric.json", "r") as f:
-        data = json.load(f)
-        QUESTION = data["question"]
-        expanded_rubric = data["concepts"]
 
-    question_vec = get_embedding(QUESTION)
-
+def build_rubric_vectors(expanded_rubric):
     rubric_vectors = {}
 
-    for concept, data in expanded_rubric.items():
-        keyword_vecs = [get_embedding(k) for k in data["keywords"]]
-        explanation_vecs = [get_embedding(e) for e in data["explanations"]]  # Use the first explanation for now
-    
+    for concept, concept_data in expanded_rubric.items():
+        keyword_vecs = [get_embedding(k) for k in concept_data["keywords"]]
+        explanation_vecs = [get_embedding(e) for e in concept_data["explanations"]]
+
         rubric_vectors[concept] = {
-            "keywords": data["keywords"],
+            "keywords": concept_data["keywords"],
             "keyword_vecs": keyword_vecs,
             "explanation_vecs": explanation_vecs,
-            "marks": data["marks"]
+            "marks": concept_data["marks"]
         }
-    
+
+    return rubric_vectors
+
+
+def main():
+    load_dotenv()
+    api_key = os.getenv("GOOGLE_API_KEY")
+
+    print("Step 1: Converting PDF to images...")
+    page_paths = pdf_to_images(PDF_PATH, IMAGE_OUTPUT_DIR)
+
+    print("Step 2: Extracting text...")
+    full_text, all_pages_text = extract_pages_text(page_paths, api_key)
+    save_extracted_text(all_pages_text, EXTRACTED_TEXT_PATH)
+
+    print("\nStep 3: Generating embeddings...")
+    cleaned_text = clean_text(full_text)
+    normalized_text = normalize_text(cleaned_text)
+    normalized_text = filter_short_tokens(normalized_text, VALID_SHORT_WORDS)
+
+    if DEBUG:
+        print("\n--- CLEANED TEXT ---\n", cleaned_text)
+        print("\n--- NORMALIZED TEXT ---\n", normalized_text)
+
+    sentence_vectors = prepare_sentence_vectors(full_text)
+
+    question, expanded_rubric = load_blueprint(BLUEPRINT_PATH)
+    question_vec = get_embedding(question)
+    rubric_vectors = build_rubric_vectors(expanded_rubric)
+
     print("Step 4: Scoring...")
     score, detected = score_answer(
-                                sentences_vec, 
-                                rubric_vectors, 
-                                normalized_text,
-                                question_vec
-                               )
+        sentence_vectors,
+        rubric_vectors,
+        normalized_text,
+        question_vec
+    )
+
+    total_marks = sum(item["marks"] for item in expanded_rubric.values())
 
     print("\nDetected Concepts:", detected)
-    print("Final Score:", score, "/", len(rubric))
+    print("Final Score:", score, "/", total_marks)
 
 
 if __name__ == "__main__":
