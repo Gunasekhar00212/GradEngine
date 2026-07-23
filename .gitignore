@@ -24,8 +24,18 @@ env/
 # Generated data (optional)
 # -------------------------
 data/pages/
+data/crops/
 data/extracted_text/
+data/extracted/
 data/vectors/
+data/uploads/
+data/outputs/
+
+# -------------------------
+# App cache and generated UI files
+# -------------------------
+app/__pycache__/
+app/**/__pycache__/
 
 # -------------------------
 # Logs
