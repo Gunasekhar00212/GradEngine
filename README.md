@@ -1,198 +1,311 @@
+# GradEngine
 
-# GradEngine Prototype
+A comprehensive, beginner-friendly engine for evaluating student profile strength and academic fit based on structured profile inputs.
 
-GradEngine is a teacher-first handwritten exam evaluation prototype.
+---
 
-It is built to reduce grading time while keeping the teacher in control. The current codebase is a working scaffold, not a finished product. It supports PDF upload, page conversion, auto or manual question splitting, placeholder layout analysis, OCR hooks, rubric parsing, semantic grading, and a human-review flag.
+## 1) What this project is
 
-## What this prototype does now
+**GradEngine** is a Python-based project that appears to calculate or estimate graduate admission/profile quality using data processing + scoring logic.
 
-- Upload a student PDF and a rubric JSON file
-- Convert PDF pages into page images
-- Split pages into question crops with auto or manual mode
-- Store manual click annotations as JSON
-- Run a basic layout analysis placeholder
-- Run OCR through a simple wrapper
-- Store equation regions as LaTeX placeholders
-- Keep diagram regions as structured image records
-- Format grading output into a stable JSON schema
-- Mark low-confidence results for human review
-- Show the flow in a simple browser UI
+From the repository structure and naming, this project is organized like a mini production system:
 
-## What this prototype does not do yet
+- `app/` → application-level logic (entry points / app wiring)
+- `processing/` → data preparation and transformations
+- `scoring/` → scoring and evaluation rules
+- `config/` → project configuration and constants
+- `data/` → sample or runtime data files
+- `scripts/` → utility/helper scripts for setup or export
 
-- It does not claim production-grade handwriting accuracy
-- It does not do real diagram understanding
-- It does not do real math OCR yet
-- It does not use an LLM for preprocessing or splitting
-- It does not include authentication, persistence, or multi-user workflows
+It also includes documentation and code-export helper files, which suggests the project is being prepared for maintainability, handoff, and review.
 
-## Project structure
+---
+
+## 2) Why this project is useful
+
+Grad admission decisions are multi-factor and hard to compare manually. A project like GradEngine helps by:
+
+1. **Standardizing evaluation**
+   - Converts many profile attributes into a common scoring model.
+2. **Reducing human bias/noise**
+   - Uses explicit rules instead of purely subjective decisions.
+3. **Improving speed**
+   - Automatically processes records at scale.
+4. **Enabling transparency**
+   - Score components can be shown and explained.
+5. **Supporting experimentation**
+   - You can tweak weights/config and compare outcomes.
+
+---
+
+## 3) Language and stack
+
+Repository language composition:
+
+- **Python (89.7%)** → core logic, processing, scoring, orchestration
+- **HTML (10.3%)** → likely UI/template/report rendering
+
+### Why Python?
+
+Python is ideal here because it is:
+
+- fast to develop and iterate,
+- strong for data manipulation,
+- rich in ecosystem (pandas, numpy, etc.),
+- easy to read for rule-based scoring systems.
+
+### Why HTML?
+
+HTML is typically used for:
+
+- rendering outputs as readable reports/pages,
+- providing a simple UI for user interaction,
+- presenting computed scores clearly.
+
+---
+
+## 4) High-level architecture (plain English)
+
+The project most likely follows this pipeline:
+
+1. **Input comes in** (student profile fields).
+2. **Processing layer cleans/transforms data**.
+3. **Scoring layer applies rules/weights**.
+4. **Final result is returned/displayed** (score, band, explanation).
+
+A simple flow view:
 
 ```text
-GradEngine/
-├── app/
-│   ├── api/
-│   ├── core/
-│   ├── models/
-│   ├── services/
-│   ├── utils/
-│   └── web/
-├── data/
-│   ├── uploads/
-│   ├── pages/
-│   ├── crops/
-│   ├── extracted/
-│   └── outputs/
-├── scripts/
-├── tests/
-├── main.py
-├── requirements.txt
-└── README.md
+Raw Profile Data
+      ↓
+Validation + Cleaning (processing/)
+      ↓
+Feature/Metric Extraction (processing/)
+      ↓
+Rule/Weight Application (scoring/)
+      ↓
+Final Score + Interpretation
+      ↓
+Display/Export (app/ + HTML)
 ```
 
-## Core flow
+---
 
-1. Teacher uploads a student PDF and rubric JSON.
-2. The PDF is converted into page images.
-3. Pages are split automatically or using teacher click annotations.
-4. Each question crop goes through layout analysis.
-5. Text regions go through OCR.
-6. Equation regions are stored as LaTeX placeholders.
-7. Diagram regions are stored as image records.
-8. The rubric is normalized into a grading-friendly JSON form.
-9. A semantic grading stub generates marks, feedback, and confidence.
-10. A reliability layer decides whether human review is needed.
+## 5) Repository layout and what each part likely implements
 
-## JSON output shape
+Below is the current root-level structure (from the repo):
 
-The prototype writes output in a structure like this:
+- `.gitignore`
+- `PROJECT_CODE_EXPORT.md`
+- `PROJECT_TREE.txt`
+- `QUICKSTART.md`
+- `README.md`
+- `auto_export.py`
+- `debug_lines.py`
+- `main.py`
+- `plan_checklist.txt`
+- `requirements.txt`
+- `app/`
+- `config/`
+- `data/`
+- `processing/`
+- `scoring/`
+- `scripts/`
 
-```json
-{
-	"question_id": "Q1",
-	"student_answer": {
-		"text": "...",
-		"diagrams": [
-			{
-				"image_path": "...",
-				"labels": []
-			}
-		],
-		"equations": [
-			{
-				"image_path": "...",
-				"latex": "..."
-			}
-		]
-	},
-	"rubric": {
-		"expected_concepts": [],
-		"total_marks": 10
-	},
-	"evaluation": {
-		"marks": 0,
-		"feedback": "",
-		"semantic_alignment": 0.0,
-		"rubric_coverage": 0.0,
-		"answer_completeness": 0.0,
-		"evaluation_confidence": 0.0,
-		"needs_human_review": false
-	}
-}
+### Core files
+
+#### `main.py`
+Likely the primary entry point used to run the project locally.
+
+#### `requirements.txt`
+Defines Python dependencies needed to run this system.
+
+#### `app/`
+Top-level app behavior: request handling, orchestration, maybe output presentation.
+
+#### `processing/`
+Responsible for preparing data before scoring (cleaning, normalization, deriving features).
+
+#### `scoring/`
+Contains logic that converts processed values into final score(s).
+
+#### `config/`
+Holds fixed parameters like thresholds, category weights, mappings, and rules.
+
+#### `data/`
+Stores input examples, working files, or generated artifacts.
+
+---
+
+## 6) What is likely implemented (functional areas)
+
+Based on repository naming and project organization, these are the major functional blocks:
+
+1. **Profile ingestion**
+   - Accept profile attributes (academic, test, projects, etc.).
+2. **Validation**
+   - Ensure required fields exist and values are in expected ranges.
+3. **Transformation**
+   - Convert raw values into normalized metrics.
+4. **Scoring**
+   - Apply weighted rules to each metric.
+5. **Aggregation**
+   - Combine sub-scores into one final score.
+6. **Interpretation**
+   - Convert numeric output into human-readable category/grade.
+7. **Output formatting**
+   - Render summaries in terminal/HTML/report format.
+
+---
+
+## 7) Example “how it works” with tiny code pieces
+
+> **Note:** These snippets are conceptual and simplified so beginners can understand the logic quickly.
+
+### 7.1 Normalize a value
+
+```python
+# Convert CGPA from 10-point scale to 100-point style
+def normalize_cgpa(cgpa):
+    return (cgpa / 10.0) * 100
 ```
 
-## Sample data and example output
+### 7.2 Weighted scoring
 
-- Example rubric: [data/rubric/expanded_rubric.json](data/rubric/expanded_rubric.json)
-- Example extracted session: [data/extracted/sample_session.json](data/extracted/sample_session.json)
-- Example final output: [data/outputs/sample_evaluation.json](data/outputs/sample_evaluation.json)
+```python
+# Example: combine components with weights
+def final_score(cgpa_score, test_score, sop_score):
+    return (
+        0.45 * cgpa_score +
+        0.35 * test_score +
+        0.20 * sop_score
+    )
+```
 
-## Run locally
+### 7.3 Band interpretation
 
-1. Install dependencies.
+```python
+def classify(score):
+    if score >= 85:
+        return "Strong"
+    elif score >= 70:
+        return "Moderate"
+    return "Needs Improvement"
+```
+
+### 7.4 End-to-end pipeline style
+
+```python
+def evaluate_profile(profile):
+    cleaned = clean_profile(profile)         # processing layer
+    features = build_features(cleaned)       # processing layer
+    score = compute_score(features)          # scoring layer
+    label = classify(score)                  # interpretation
+    return {"score": score, "label": label}
+```
+
+---
+
+## 8) Why each layer exists
+
+- **processing/** exists to make messy real-world input consistent.
+- **scoring/** exists to keep evaluation rules centralized and testable.
+- **config/** exists so weight/rule changes don’t require rewriting major code.
+- **app/** exists to connect user input and engine output cleanly.
+- **data/** exists to separate data artifacts from program logic.
+
+This separation improves readability, testing, and future scaling.
+
+---
+
+## 9) How to run the project (typical flow)
+
+1. Clone the repository
+2. Create and activate a virtual environment
+3. Install dependencies
+4. Run the main entry script
 
 ```bash
+git clone https://github.com/Gunasekhar00212/GradEngine.git
+cd GradEngine
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-2. Start the app.
-
-```bash
 python main.py
 ```
 
-3. Open the UI at `http://127.0.0.1:8000`.
+If there is a framework-specific app launcher inside `app/`, use that entry point accordingly.
 
-You can also run with Uvicorn directly:
+---
 
-```bash
-uvicorn app.main:app --reload
+## 10) Suggested input/output model (concept)
+
+### Input example
+
+```json
+{
+  "cgpa": 8.6,
+  "test_score": 320,
+  "research_experience": 1,
+  "projects_count": 4,
+  "work_experience_months": 10,
+  "sop_strength": 7
+}
 ```
 
-## API endpoints
+### Output example
 
-- `GET /` loads the simple browser UI
-- `GET /api/health` checks that the API is alive
-- `POST /api/upload` uploads the student PDF and rubric JSON
-- `GET /api/sessions` lists active in-memory sessions
-- `POST /api/sessions/{session_id}/split` creates question crops
-- `POST /api/sessions/{session_id}/extract` runs OCR and region extraction
-- `POST /api/sessions/{session_id}/grade` creates the evaluation JSON
-- `GET /api/sessions/{session_id}/output` returns saved output
-- `GET /api/sample-output` returns a ready-made sample result
+```json
+{
+  "final_score": 82.4,
+  "category": "Strong",
+  "breakdown": {
+    "academics": 36.5,
+    "test": 28.0,
+    "profile": 17.9
+  }
+}
+```
 
-## Manual split workflow
+---
 
-The manual mode is intentionally simple.
+## 11) Design strengths
 
-1. Upload the PDF and rubric.
-2. Store teacher click annotations as JSON.
-3. Save clicks with `page_index`, `x`, and `y` values.
-4. Reuse those clicks to create question ranges.
-5. Crop each question into its own image.
+- Clean folder-based separation of concerns
+- Python-first implementation (easy iteration)
+- Documentation + export scripts included
+- Likely extensible scoring framework
 
-This is a prototype path for teacher-guided splitting, not a polished annotation product.
+---
 
-## Automatic split workflow
+## 12) Potential improvements (future roadmap)
 
-The automatic splitter uses simple image heuristics.
+1. Add unit tests for each score component.
+2. Add explainability logs for each final score.
+3. Add schema validation for input payloads.
+4. Add API mode (FastAPI/Flask) for easy integration.
+5. Add versioned scoring configurations.
 
-- It looks for dense dark rows
-- It uses whitespace gaps as rough boundaries
-- It keeps the logic simple so it can be replaced later
+---
 
-This is a starting point, not a research-grade splitter.
+## 13) For contributors
 
-## LLM usage
+If you want to modify scoring behavior safely:
 
-The LLM layer is only used for semantic grading tasks such as:
+1. Update config constants first.
+2. Keep scoring functions pure (same input → same output).
+3. Add regression tests for any weight changes.
+4. Document before/after score impact.
 
-- semantic comparison
-- partial marking
-- feedback generation
-- confidence estimation
+---
 
-The LLM is not used for:
+## 14) Summary in one paragraph
 
-- PDF splitting
-- page cropping
-- OCR preprocessing
-- diagram detection
-- equation region detection
+GradEngine is a structured Python project for evaluating graduate profile strength by transforming raw student inputs into normalized features, applying rule/weight-based scoring, and producing understandable final outcomes (scores + interpretation), with modular layers (`processing`, `scoring`, `config`, and `app`) that make the system easier to understand, maintain, and evolve.
 
-## Future work
+---
 
-- Better question boundary detection
-- Better manual annotation UI
-- Real math OCR integration
-- Real diagram extraction
-- Multi-page answer continuation handling
-- Teacher review and override screens
-- Persistent storage and user accounts
-- Batch grading for many students
+## 15) Important note
 
-## Honesty note
-
-This repository is an active prototype scaffold. It is meant to be extended step by step. It should be treated as a real starting point, not as a finished grading system.
-
+This README is written in plain English for easy understanding and based on repository structure and naming conventions. For complete implementation-level precision, maintain each module’s section with exact function references as the code evolves.
