@@ -1,6 +1,5 @@
-from sentence_transformers import SentenceTransformer
+"""Compatibility wrapper for backend.scoring.embedding."""
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+from __future__ import annotations
 
-def get_embedding(text):
-    return model.encode(text)
+from backend.scoring.embedding import *

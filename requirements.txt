@@ -4,12 +4,13 @@ jinja2
 python-multipart
 pydantic
 python-dotenv
+pymongo
 pdf2image
 Pillow
-pytesseract
 opencv-python
 numpy
 scikit-learn
 sentence-transformers
 torch
-transformers
+google-genai
+pix2tex

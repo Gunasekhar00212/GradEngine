@@ -1,26 +1,25 @@
 ## GradEngine Prototype — Quick Start
 
-The FastAPI server is running at `http://127.0.0.1:8000`
+The FastAPI API runs at `http://127.0.0.1:8000`. The React app runs at
+`http://127.0.0.1:5173` during development.
 
 ### Access Points
 
-- **UI Dashboard**: http://127.0.0.1:8000
+- **React UI**: http://127.0.0.1:5173
 - **API Docs (Swagger)**: http://127.0.0.1:8000/docs
 - **Health Check**: `curl http://127.0.0.1:8000/api/health`
 
 ### Sample Workflow
 
-1. Open the dashboard in your browser.
-2. Upload:
+1. Start the API with `python main.py`.
+2. In another terminal, run `cd frontend && npm install && npm run dev`.
+3. Open the React UI in your browser.
+4. Upload:
    - A student PDF (or use a test PDF)
    - A rubric JSON (example: `data/rubric/expanded_rubric.json`)
-3. Choose split mode: **auto** or **manual**.
-4. Click **Upload files** to start the pipeline.
-5. The dashboard will run through:
-   - Split pages into questions
-   - Extract text and regions
-   - Generate evaluation JSON
-6. View the results in real-time.
+5. Click each question boundary on the full-page splitter.
+6. Choose **Finish and grade** to split, extract text, and evaluate.
+7. View the score screen.
 
 ### Example Rubric
 
@@ -31,7 +30,7 @@ See `data/rubric/expanded_rubric.json`:
 
 ### Example Output
 
-See `data/outputs/sample_evaluation.json`:
+See `data/reports/sample_evaluation.json`:
 - Structured JSON with student answer, rubric, and evaluation
 - Includes confidence scores and human-review flag
 
@@ -53,7 +52,7 @@ In the terminal where it's running, press `Ctrl+C`.
 
 ### Next Steps
 
-- Replace placeholder OCR with real handwriting recognition
+- Configure `GEMINI_API_KEY` before extraction; Gemini OCR is used for handwritten text
 - Add manual annotation UI for boundary drawing
 - Integrate real LaTeX equation detection
 - Add persistence layer (database)

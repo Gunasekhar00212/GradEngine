@@ -23,8 +23,18 @@ env/
 # -------------------------
 # Generated data (optional)
 # -------------------------
+data/input/
 data/pages/
 data/crops/
+data/question_crops/
+data/text/
+data/diagrams/
+data/equations/
+data/answer_json/
+data/rubric_json/
+data/evaluations/
+data/reliability/
+data/reports/
 data/extracted_text/
 data/extracted/
 data/vectors/
@@ -41,3 +51,6 @@ app/**/__pycache__/
 # Logs
 # -------------------------
 *.log
+
+frontend/node_modules/
+frontend/dist/

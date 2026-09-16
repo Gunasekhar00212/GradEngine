@@ -1,0 +1,1 @@
+"""Equation extraction stage."""

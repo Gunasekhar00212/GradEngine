@@ -3,7 +3,7 @@
 
 GradEngine is a teacher-first handwritten exam evaluation prototype.
 
-It is built to reduce grading time while keeping the teacher in control. The current codebase is a working scaffold, not a finished product. It supports PDF upload, page conversion, auto or manual question splitting, OCR/equation/diagram placeholders, rubric mapping, semantic grading stubs, and confidence-based review flags.
+It is built to reduce grading time while keeping the teacher in control. The current codebase is a working scaffold, not a finished product. It supports PDF upload, page conversion, auto or manual question splitting, placeholder layout analysis, OCR hooks, rubric parsing, semantic grading, and a human-review flag.
 
 ## What this prototype does now
 
@@ -11,10 +11,9 @@ It is built to reduce grading time while keeping the teacher in control. The cur
 - Convert PDF pages into page images
 - Split pages into question crops with auto or manual mode
 - Store manual click annotations as JSON
-- Run a basic layout analysis placeholder
-- Run OCR through a simple wrapper
-- Store equation regions as LaTeX placeholders
-- Keep diagram regions as structured image records
+- Create a persistent full-question text crop for each split answer
+- Transcribe text regions with Google Gemini Vision
+- Grade saved Answer JSON against Rubric JSON with Gemini
 - Format grading output into a stable JSON schema
 - Mark low-confidence results for human review
 - Show the flow in a simple browser UI
@@ -31,13 +30,13 @@ It is built to reduce grading time while keeping the teacher in control. The cur
 
 ```text
 GradEngine/
-├── app/
-│   ├── api/
-│   ├── core/
-│   ├── models/
-│   ├── services/
-│   ├── utils/
-│   └── web/
+├── backend/
+│   └── app/
+│       ├── api/
+│       ├── core/
+│       ├── models/
+│       ├── services/
+│       └── utils/
 ├── data/
 │   ├── uploads/
 │   ├── pages/
@@ -58,10 +57,10 @@ GradEngine/
 3. Pages are split automatically or using teacher click annotations.
 4. Each question crop goes through layout analysis.
 5. Text regions go through OCR.
-6. Equation regions are stored as LaTeX placeholders.
-7. Diagram regions are stored as image records.
+6. Gemini returns structured OCR data, which is saved as Answer JSON.
+7. The Answer JSON and Rubric JSON are sent to Gemini for structured evaluation.
 8. The rubric is normalized into a grading-friendly JSON form.
-9. A semantic grading stub generates marks, feedback, and confidence.
+9. Gemini evaluates the Answer JSON against the Rubric JSON and returns marks, feedback, and confidence.
 10. A reliability layer decides whether human review is needed.
 
 ## JSON output shape
@@ -106,7 +105,7 @@ The prototype writes output in a structure like this:
 
 - Example rubric: [data/rubric/expanded_rubric.json](data/rubric/expanded_rubric.json)
 - Example extracted session: [data/extracted/sample_session.json](data/extracted/sample_session.json)
-- Example final output: [data/outputs/sample_evaluation.json](data/outputs/sample_evaluation.json)
+- Example final output: [data/reports/sample_evaluation.json](data/reports/sample_evaluation.json)
 
 ## Run locally
 
@@ -115,6 +114,15 @@ The prototype writes output in a structure like this:
 ```bash
 pip install -r requirements.txt
 ```
+
+Set the Gemini credential before starting the API:
+
+```bash
+export GEMINI_API_KEY="your-key"
+```
+
+`GEMINI_OCR_MODEL` and `GEMINI_EVALUATION_MODEL` are optional and default to
+`gemini-2.5-flash`.
 
 2. Start the app.
 
@@ -127,7 +135,7 @@ python main.py
 You can also run with Uvicorn directly:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn backend.app.main:app --reload
 ```
 
 ## API endpoints
@@ -185,8 +193,7 @@ The LLM is not used for:
 
 - Better question boundary detection
 - Better manual annotation UI
-- Real math OCR integration
-- Real diagram extraction
+- Add genuine diagram and equation detection before enabling their extractors
 - Multi-page answer continuation handling
 - Teacher review and override screens
 - Persistent storage and user accounts
@@ -195,4 +202,3 @@ The LLM is not used for:
 ## Honesty note
 
 This repository is an active prototype scaffold. It is meant to be extended step by step. It should be treated as a real starting point, not as a finished grading system.
-

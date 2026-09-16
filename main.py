@@ -1,13 +1,7 @@
-"""Local launcher for the GradEngine FastAPI prototype."""
-
-from __future__ import annotations
+"""Local development entrypoint for GradEngine."""
 
 import uvicorn
 
-from app.main import app
-
 
 if __name__ == "__main__":
-    """Run the development server when the file is executed directly."""
-
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("backend.app.main:app", host="127.0.0.1", port=8000, reload=True)
