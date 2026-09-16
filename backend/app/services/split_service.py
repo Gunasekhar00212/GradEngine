@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from PIL import Image
 
@@ -177,3 +178,64 @@ class SplitService:
             target = output / f"page_{page_index + 1}_q{index}.png"
             question_paths.append(crop_image(page, (0, top, width, bottom), target))
         return question_paths
+
+    def validate_boundaries(self, groups: list[dict[str, int | None]], num_pages: int) -> dict[str, Any]:
+        """Validate question boundary groups for obvious errors.
+        
+        Returns:
+        {
+            "valid": bool,
+            "errors": list[str],
+            "warnings": list[str]
+        }
+        """
+        errors: list[str] = []
+        warnings: list[str] = []
+
+        if not groups:
+            errors.append("No questions detected")
+            return {"valid": False, "errors": errors, "warnings": warnings}
+
+        for i, group in enumerate(groups):
+            q_index = i + 1
+            start_page = int(group.get("start_page") or 0)
+            end_page = int(group.get("end_page") or start_page)
+            start_y = int(group.get("start_y") or 0)
+            end_y = group.get("end_y")
+
+            # Basic range checks
+            if start_page < 0 or start_page >= num_pages:
+                errors.append(f"Q{q_index}: start_page {start_page} out of range [0, {num_pages-1}]")
+            if end_page < 0 or end_page >= num_pages:
+                errors.append(f"Q{q_index}: end_page {end_page} out of range [0, {num_pages-1}]")
+            if start_page > end_page:
+                errors.append(f"Q{q_index}: starts on page {start_page} but ends on page {end_page}")
+
+        return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
+
+    def detect_likely_continuation(self, text: str) -> bool:
+        """Heuristically detect if OCR text looks like a sentence continuation."""
+        if not text:
+            return False
+
+        text = text.strip()
+        first_line = text.split("\n")[0] if "\n" in text else text
+
+        # Starts with lowercase (likely not a new sentence)
+        if first_line and first_line[0].islower():
+            return True
+
+        # Starts with continuation phrases
+        continuation_phrases = [
+            "a ", "an ", "the ", "and ", "or ", "but ", "because", "which", "that", "this",
+            "these", "those", "it ", "its ", "then ", "when ", "where ", "who ", "what ", "why ",
+            "how ", "if ", "unless ", "while ", "after ", "before ", "during ", "within ",
+            "he ", "she ", "they ", "we ", "you ", "him ", "her ", "them ", "us "
+        ]
+
+        for phrase in continuation_phrases:
+            if first_line.lower().startswith(phrase):
+                return True
+
+        return False
+

@@ -63,6 +63,17 @@ class LlmEvaluationService:
                 )
 
             image_part = self._image_part(image_path or self._question_image_path(answer_payload), types)
+            
+            # DEBUG: Log what's being sent to Gemini
+            print("\n" + "="*80)
+            print("GEMINI EVALUATION DEBUG")
+            print("="*80)
+            print(f"Question ID: {answer_payload.get('question_id')}")
+            print(f"Image Path Being Sent: {image_path or self._question_image_path(answer_payload)}")
+            print(f"Image Part Present: {image_part is not None}")
+            print(f"OCR Text (first 300 chars): {answer_payload.get('text', '')[:300]}")
+            print(f"OCR Confidence: {answer_payload.get('quality', {}).get('ocr', [{}])[0].get('confidence', 'N/A')}")
+            print("="*80 + "\n")
 
             for attempt in range(3):
                 try:
@@ -89,9 +100,11 @@ class LlmEvaluationService:
     @staticmethod
     def _prompt(answer_payload: dict[str, Any], rubric_payload: dict[str, Any]) -> str:
         return (
-            "Grade the student answer against the rubric. Use only evidence in the answer. "
-            "Award marks criterion by criterion, do not exceed total_marks, and flag human "
-            "review if OCR text is missing or unreliable. Return JSON that matches the schema.\n\n"
+            "Grade the student answer against the rubric using both the attached question image "
+            "and the OCR text. The image is the primary source of truth; OCR may be incomplete "
+            "or wrong for handwritten text. Evaluate diagrams visually from the image. Award marks "
+            "criterion by criterion, do not exceed total_marks, and flag human review if the answer "
+            "is unclear or incomplete. Return JSON that matches the schema.\n\n"
             f"ANSWER_JSON:\n{json.dumps(answer_payload, ensure_ascii=False)}\n\n"
             f"RUBRIC_JSON:\n{json.dumps(rubric_payload, ensure_ascii=False)}"
         )
@@ -119,12 +132,15 @@ class LlmEvaluationService:
                 "semantic_alignment": {"type": "number", "minimum": 0, "maximum": 1},
                 "rubric_coverage": {"type": "number", "minimum": 0, "maximum": 1},
                 "answer_completeness": {"type": "number", "minimum": 0, "maximum": 1},
+                "equation_correctness": {"type": "number", "minimum": 0, "maximum": 1},
+                "diagram_coverage": {"type": "number", "minimum": 0, "maximum": 1},
                 "evaluation_confidence": {"type": "number", "minimum": 0, "maximum": 1},
                 "needs_human_review": {"type": "boolean"},
             },
             "required": [
                 "marks", "feedback", "criteria_results", "semantic_alignment", "rubric_coverage",
-                "answer_completeness", "evaluation_confidence", "needs_human_review",
+                "answer_completeness", "equation_correctness", "diagram_coverage",
+                "evaluation_confidence", "needs_human_review",
             ],
         }
 
@@ -139,8 +155,8 @@ class LlmEvaluationService:
             semantic_alignment=clamp(payload.get("semantic_alignment")),
             rubric_coverage=clamp(payload.get("rubric_coverage")),
             answer_completeness=clamp(payload.get("answer_completeness")),
-            equation_correctness=0.0,
-            diagram_coverage=0.0,
+            equation_correctness=clamp(payload.get("equation_correctness")),
+            diagram_coverage=clamp(payload.get("diagram_coverage")),
             evaluation_confidence=clamp(payload.get("evaluation_confidence")),
             needs_human_review=bool(payload.get("needs_human_review", False)),
             evaluation_source="GEMINI",

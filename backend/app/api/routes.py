@@ -185,19 +185,41 @@ def split_session(session_id: str) -> dict[str, Any]:
 	question_paths: list[str] = []
 	session_boundaries = []
 
+	# DEBUG: Log splitting process
+	print("\n" + "="*80)
+	print("SPLIT SESSION DEBUGGING")
+	print("="*80)
+	print(f"Session ID: {session_id}")
+	print(f"Mode: {session.mode}")
+	print(f"Total pages: {len(session.page_paths)}")
+	print(f"Page paths: {session.page_paths}")
+
 	if session.mode == "manual":
 		annotation_path = PATHS.upload_dir / session_id / "manual_clicks.json"
 		clicks = split_service.load_manual_clicks(annotation_path)
 		groups = split_service.group_pages_by_question(clicks, len(session.page_paths))
+		print(f"\nManual mode - Groups from clicks:")
+		for i, group in enumerate(groups, start=1):
+			print(f"  Q{i}: pages {group.get('start_page')} to {group.get('end_page')}, y: {group.get('start_y')} to {group.get('end_y')}")
 		for group in groups:
-			question_paths.append(split_service.crop_question_image(group, session.page_paths, question_dir))
+			question_path = split_service.crop_question_image(group, session.page_paths, question_dir)
+			question_paths.append(question_path)
 			all_boundaries.append(group)
+			print(f"  Cropped: {question_path}")
 	else:
+		print(f"\nAuto mode - Detecting boundaries per page:")
 		for page_index, page_path in enumerate(session.page_paths):
 			boundaries = split_service.auto_detect_boundaries(page_path, page_index)
+			print(f"  Page {page_index}: found {len(boundaries)} questions")
+			for i, b in enumerate(boundaries, start=1):
+				print(f"    Q{i}: y {b.start_y} to {b.end_y}")
 			question_paths.extend(split_service.crop_questions(page_path, boundaries, question_dir, page_index))
 			session_boundaries.extend(boundaries)
 			all_boundaries.extend([boundary.model_dump() for boundary in boundaries])
+
+	print(f"\nTotal questions detected: {len(question_paths)}")
+	print(f"Question paths: {question_paths}")
+	print("="*80 + "\n")
 
 	session.boundaries = session_boundaries
 	session.question_paths = question_paths
@@ -218,6 +240,130 @@ def split_session(session_id: str) -> dict[str, Any]:
 	}
 
 
+@router.get("/api/sessions/{session_id}/split-preview")
+def get_split_preview(session_id: str) -> dict[str, Any]:
+	"""Get crop previews and OCR snippets to verify the split was correct."""
+
+	session = _get_session_or_404(session_id)
+	if not session.question_paths or not session.boundaries:
+		raise HTTPException(status_code=400, detail="Split the pages first")
+
+	# Validate the boundaries first
+	validation = split_service.validate_boundaries(session.boundaries, len(session.page_paths))
+	
+	previews = []
+	for index, question_path in enumerate(session.question_paths, start=1):
+		question_id = f"Q{index}"
+		boundary = session.boundaries[index - 1] if index - 1 < len(session.boundaries) else {}
+		
+		# Quick OCR preview of the crop
+		region_dir = PATHS.extracted_dir / session_id / question_id / "regions"
+		layout = layout_service.create_region_crops(question_path, region_dir)
+		ocr_results = [ocr_service.extract(region["image_path"]) for region in layout["text_regions"]]
+		ocr_text = " ".join([result["text"] for result in ocr_results if result["text"]])
+		
+		# Use the new detection method
+		looks_like_continuation = split_service.detect_likely_continuation(ocr_text)
+		
+		previews.append({
+			"question_id": question_id,
+			"boundary": boundary,
+			"crop_path": f"/api/sessions/{session_id}/crop/{question_id}",
+			"ocr_start": ocr_text[:200],
+			"looks_like_continuation": looks_like_continuation,
+			"warning": "⚠️ Possible split error: text appears to start mid-sentence" if looks_like_continuation else None,
+		})
+	
+	return {
+		"session_id": session_id,
+		"validation": validation,
+		"previews": previews,
+	}
+
+
+@router.post("/api/sessions/{session_id}/adjust-boundary")
+def adjust_boundary(session_id: str, adjustments: dict[str, Any]) -> dict[str, Any]:
+	"""Re-split with adjusted boundary coordinates.
+	
+	Expected format:
+	{
+		"boundaries": [
+			{"start_page": 1, "start_y": 800, "end_page": 4, "end_y": 1500},
+			...
+		]
+	}
+	"""
+
+	session = _get_session_or_404(session_id)
+	if not session.page_paths:
+		raise HTTPException(status_code=400, detail="No page images available")
+
+	question_dir = PATHS.question_crops_dir / session_id
+	new_boundaries = adjustments.get("boundaries", [])
+	
+	if not new_boundaries:
+		raise HTTPException(status_code=400, detail="No boundary adjustments provided")
+
+	print("\n" + "="*80)
+	print("ADJUST BOUNDARY DEBUGGING")
+	print("="*80)
+	print(f"Session ID: {session_id}")
+	print(f"Adjusting {len(new_boundaries)} questions:")
+
+	question_paths = []
+	all_boundaries = []
+	
+	for i, boundary in enumerate(new_boundaries, start=1):
+		print(f"  Q{i}: pages {boundary.get('start_page')} to {boundary.get('end_page')}, y: {boundary.get('start_y')} to {boundary.get('end_y')}")
+		question_path = split_service.crop_question_image(boundary, session.page_paths, question_dir)
+		question_paths.append(question_path)
+		all_boundaries.append(boundary)
+		print(f"       Cropped: {question_path}")
+
+	print("="*80 + "\n")
+
+	session.boundaries = session_boundaries = all_boundaries
+	session.question_paths = question_paths
+	save_session(session)
+	evaluation_repository.update_session(
+		session_id,
+		{
+			"status": "split_complete",
+			"boundaries": all_boundaries,
+			"question_paths": question_paths,
+		},
+	)
+
+	return {
+		"session_id": session_id,
+		"boundaries": all_boundaries,
+		"question_paths": question_paths,
+		"message": "Boundaries adjusted and re-cropped. Call /split-preview to verify.",
+	}
+
+
+@router.get("/api/sessions/{session_id}/crop/{question_id}")
+def get_crop_image(session_id: str, question_id: str) -> FileResponse:
+	"""Return the crop image for preview in the UI."""
+
+	session = _get_session_or_404(session_id)
+	
+	# Extract question index from question_id (e.g., "Q1" -> 0)
+	try:
+		q_index = int(question_id[1:]) - 1
+	except (ValueError, IndexError):
+		raise HTTPException(status_code=400, detail="Invalid question_id format")
+	
+	if q_index < 0 or q_index >= len(session.question_paths):
+		raise HTTPException(status_code=404, detail="Question not found")
+	
+	crop_path = Path(session.question_paths[q_index])
+	if not crop_path.is_file():
+		raise HTTPException(status_code=404, detail="Crop image not found")
+	
+	return FileResponse(crop_path, media_type="image/png")
+
+
 @router.post("/api/sessions/{session_id}/extract")
 def extract_session(session_id: str) -> dict[str, Any]:
 	"""Run OCR and region extraction over the split question images."""
@@ -228,14 +374,32 @@ def extract_session(session_id: str) -> dict[str, Any]:
 
 	extracted: list[dict[str, Any]] = []
 	answer_json_paths: list[str] = []
+	
+	# DEBUG: Log page-to-question mapping
+	print("\n" + "="*80)
+	print("EXTRACT SESSION DEBUGGING")
+	print("="*80)
+	print(f"Session ID: {session_id}")
+	print(f"Number of question paths: {len(session.question_paths)}")
+	if hasattr(session, 'boundaries') and session.boundaries:
+		print(f"Boundaries: {session.boundaries}")
+	
 	for index, question_path in enumerate(session.question_paths, start=1):
 		question_id = f"Q{index}"
 		region_dir = PATHS.extracted_dir / session_id / question_id / "regions"
 		layout = layout_service.create_region_crops(question_path, region_dir)
 		ocr_results = [ocr_service.extract(region["image_path"]) for region in layout["text_regions"]]
+		ocr_text = " ".join([result["text"] for result in ocr_results if result["text"]])
+		
+		# DEBUG: Log what OCR extracted for this question
+		print(f"\n--- {question_id} ---")
+		print(f"Question Image Path: {question_path}")
+		print(f"OCR Text (first 200 chars): {ocr_text[:200]}")
+		print(f"OCR Confidence: {[result.get('confidence', 'N/A') for result in ocr_results]}")
+		
 		answer_json = answer_json_service.build(
 			question_id=question_id,
-			text=" ".join([result["text"] for result in ocr_results if result["text"]]),
+			text=ocr_text,
 			diagrams=[],
 			equations=[],
 			quality={
@@ -248,6 +412,8 @@ def extract_session(session_id: str) -> dict[str, Any]:
 		answer_json_service.save(answer_json_path, answer_json)
 		answer_json_paths.append(str(answer_json_path))
 		extracted.append(answer_json)
+	
+	print("="*80 + "\n")
 
 	session.extracted_questions = extracted
 	session.answer_json_paths = answer_json_paths
