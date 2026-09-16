@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -51,15 +52,23 @@ class LlmEvaluationService:
                     api_key=self._api_key,
                     http_options=types.HttpOptions(timeout=PATHS.gemini_evaluation_timeout_ms),
                 )
-            response = self._client.models.generate_content(
-                model=self._model,
-                contents=self._prompt(answer_payload, rubric_payload),
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_json_schema=self._response_schema(),
-                ),
-            )
-            return self._to_result(json.loads(response.text or "{}"), total_marks)
+
+            for attempt in range(3):
+                try:
+                    response = self._client.models.generate_content(
+                        model=self._model,
+                        contents=self._prompt(answer_payload, rubric_payload),
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_json_schema=self._response_schema(),
+                        ),
+                    )
+                    return self._to_result(json.loads(response.text or "{}"), total_marks)
+                except Exception as exc:
+                    if attempt < 2 and self._is_transient_gemini_error(exc):
+                        time.sleep(2 ** attempt)
+                        continue
+                    raise
         except Exception as exc:
             return self._review_required(total_marks, f"Gemini evaluation failed: {exc}")
 
@@ -131,3 +140,8 @@ class LlmEvaluationService:
             equation_correctness=0.0, diagram_coverage=0.0, evaluation_confidence=0.0,
             needs_human_review=True, evaluation_source="GEMINI / FAILED",
         )
+
+    @staticmethod
+    def _is_transient_gemini_error(error: Exception) -> bool:
+        message = str(error)
+        return "UNAVAILABLE" in message or "503" in message

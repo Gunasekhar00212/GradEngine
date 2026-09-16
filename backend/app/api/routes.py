@@ -268,13 +268,17 @@ def grade_session(session_id: str) -> dict[str, Any]:
 	"""Combine the extracted answer with the rubric and produce a score."""
 
 	session = _get_session_or_404(session_id)
-	rubric_payload = rubric_service.parse(session.rubric_file)
+	rubric_by_question = rubric_service.parse(session.rubric_file)
 	if not session.extracted_questions:
 		raise HTTPException(status_code=400, detail="Extract text before grading")
 
 	results = []
 	rubric_json_paths: list[str] = []
 	for extracted in session.extracted_questions:
+		rubric_payload = rubric_by_question.get(
+			extracted["question_id"],
+			{"question_id": extracted["question_id"], "expected_concepts": [], "total_marks": 0, "criteria": []},
+		)
 		rubric_json = rubric_json_service.build(extracted["question_id"], rubric_payload)
 		rubric_json_path = PATHS.rubric_json_dir / session_id / f"{extracted['question_id']}.json"
 		rubric_json_service.save(rubric_json_path, rubric_json)
