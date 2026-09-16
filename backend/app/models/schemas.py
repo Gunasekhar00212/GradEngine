@@ -69,7 +69,7 @@ class RubricSummary(BaseModel):
 class EvaluationSummary(BaseModel):
 	"""Hold the grader output in the exact structure the UI shows."""
 
-	marks: float = 0
+	marks: float | None = None
 	max_marks: float = 0
 	feedback: str = ""
 	criteria_results: list[dict[str, Any]] = Field(default_factory=list)

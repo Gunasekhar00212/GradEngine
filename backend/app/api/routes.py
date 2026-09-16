@@ -284,7 +284,7 @@ def grade_session(session_id: str) -> dict[str, Any]:
 		rubric_json_service.save(rubric_json_path, rubric_json)
 		rubric_repository.upsert_rubric(f"{session_id}:{extracted['question_id']}", rubric_json)
 		rubric_json_paths.append(str(rubric_json_path))
-		evaluation = evaluation_service.evaluate(extracted, rubric_json)
+		evaluation = evaluation_service.evaluate(extracted, rubric_json, image_path=extracted.get("source_paths", {}).get("question_image"))
 		result = reporting_service.format_question_result(
 			extracted["question_id"],
 			extracted,
