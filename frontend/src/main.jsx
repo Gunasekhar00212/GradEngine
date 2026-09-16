@@ -28,25 +28,98 @@ function Upload({ onUploaded }) {
 }
 
 function Split({ session, onComplete, onBack }) {
-  const [page, setPage] = useState(0), [clicks, setClicks] = useState([]), [height, setHeight] = useState(0), [status, setStatus] = useState("");
+  const [page, setPage] = useState(0);
+  const [clicks, setClicks] = useState([]);
+  const [height, setHeight] = useState(0);
+  const [status, setStatus] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
   const marks = clicks.filter((click) => click.page_index === page);
   const image = `/api/sessions/${session.session_id}/pages/${page}`;
-  function renumber(all) { return all.map((click, index) => ({ ...click, question_index: index + 1 })); }
-  function mark(event) { if (!height) return; const box = event.currentTarget.getBoundingClientRect(); setClicks((all) => renumber([...all, { page_index: page, y: Math.round((event.clientY - box.top) / box.height * height), question_index: all.length + 1 }])); }
-  async function finish() {
+
+  function renumber(all) {
+    return [...all]
+      .sort((a, b) => a.page_index - b.page_index || a.y - b.y)
+      .map((click, index) => ({ ...click, question_index: index + 1 }));
+  }
+
+  function mark(event) {
+    if (!height) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    const y = Math.round((event.clientY - box.top) / box.height * height);
+    setClicks((all) => renumber([...all, { page_index: page, y, question_index: all.length + 1 }]));
+  }
+
+  async function createSplitPreview() {
     try {
       setStatus("Saving question starts…");
-      await api(`/api/sessions/${session.session_id}/manual-clicks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(clicks) });
-      setStatus("Cropping question images…");
+      await api(`/api/sessions/${session.session_id}/manual-clicks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clicks),
+      });
+      setStatus("Creating question crops…");
       await api(`/api/sessions/${session.session_id}/split`, { method: "POST" });
+      setStatus("Checking split…");
+      const nextPreview = await api(`/api/sessions/${session.session_id}/split-preview`);
+      setPreview(nextPreview);
+      setShowPreview(true);
+      setStatus("");
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  function applyBoundaryChange(questionIndex, field, value) {
+    setPreview((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        previews: current.previews.map((item, index) => index === questionIndex
+          ? { ...item, boundary: { ...item.boundary, [field]: value === "" ? null : Number(value) } }
+          : item),
+      };
+    });
+  }
+
+  async function adjustAndRefresh() {
+    if (!preview?.previews?.length) return;
+    try {
+      setStatus("Applying boundary changes…");
+      const boundaries = preview.previews.map((item, index) => ({
+        ...(item.boundary || {}),
+        question_index: index + 1,
+      }));
+      await api(`/api/sessions/${session.session_id}/adjust-boundary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ boundaries }),
+      });
+      const nextPreview = await api(`/api/sessions/${session.session_id}/split-preview`);
+      setPreview(nextPreview);
+      setStatus("");
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function confirmAndGrade() {
+    try {
       setStatus("Reading handwriting with OCR…");
       await api(`/api/sessions/${session.session_id}/extract`, { method: "POST" });
       setStatus("Grading answers against the rubric…");
       onComplete((await api(`/api/sessions/${session.session_id}/grade`, { method: "POST" })).evaluation);
       setStatus("");
-    } catch (error) { setStatus(error.message); }
+    } catch (error) {
+      setStatus(error.message);
+    }
   }
-  return <main className="split"><header><div><p className="eyebrow">STEP 2 OF 3</p><h1>Mark question starts</h1></div><div><button type="button" className="secondary" onClick={onBack}>Start over</button><button type="button" onClick={finish}>Finish and grade</button></div></header><section><aside><p>Click once where each new question begins. The next click ends the previous question.</p>{session.page_paths.map((_, index) => <button type="button" key={index} className={index === page ? "tab selected" : "tab"} onClick={() => setPage(index)}>Page {index + 1}<small>{clicks.filter((point) => point.page_index === index).length} starts</small></button>)}<button type="button" className="secondary wide" onClick={() => setClicks((all) => renumber(all.filter((point) => point.page_index !== page)))}>Clear this page</button><button type="button" className="secondary wide" onClick={() => setClicks((all) => renumber(all.slice(0, -1)))}>Undo last mark</button><div className="status" style={{ color: "#d9e8fb" }}>Questions marked: {clicks.length}</div>{status && <p className="status">{status}</p>}</aside><div className="stage"><div className="canvas" onClick={mark}><img src={image} onLoad={(e) => setHeight(e.currentTarget.naturalHeight)} />{height > 0 && marks.map((point) => <i key={`${point.question_index}-${point.page_index}-${point.y}`} style={{ top: `${point.y / height * 100}%` }}>Q{point.question_index}</i>)}</div></div></section></main>;
+
+  if (showPreview) {
+    return <main className="split"><header><div><p className="eyebrow">STEP 2 OF 3</p><h1>Verify question split</h1></div><div><button type="button" className="secondary" onClick={() => setShowPreview(false)}>Back to pages</button><button type="button" onClick={confirmAndGrade} disabled={preview?.validation?.valid === false}>Confirm and grade</button></div></header><section className="preview-layout"><aside><p>Check each crop before OCR and grading. A warning means the crop may start in the middle of an answer.</p>{preview?.validation?.errors?.map((error) => <p className="validation-error" key={error}>{error}</p>)}{preview?.validation?.warnings?.map((warning) => <p className="validation-warning" key={warning}>{warning}</p>)}<button type="button" className="secondary wide" onClick={adjustAndRefresh}>Apply boundary edits</button>{status && <p className="status">{status}</p>}</aside><div className="preview-grid">{preview?.previews?.map((item, index) => <article className={`card crop-card ${item.looks_like_continuation ? "crop-warning" : ""}`} key={item.question_id}><div className="crop-heading"><div><p className="eyebrow">{item.question_id}</p><strong>{item.warning || "Split looks consistent"}</strong></div><img src={item.crop_path} alt={`${item.question_id} crop preview`} /></div><label>Start page<input type="number" value={item.boundary?.start_page ?? ""} onChange={(e) => applyBoundaryChange(index, "start_page", e.target.value)} /></label><label>Start Y<input type="number" value={item.boundary?.start_y ?? ""} onChange={(e) => applyBoundaryChange(index, "start_y", e.target.value)} /></label><label>End page<input type="number" value={item.boundary?.end_page ?? ""} onChange={(e) => applyBoundaryChange(index, "end_page", e.target.value)} /></label><label>End Y<input type="number" value={item.boundary?.end_y ?? ""} onChange={(e) => applyBoundaryChange(index, "end_y", e.target.value)} /></label><pre>{item.ocr_start || "No OCR preview available."}</pre></article>)}</div></section></main>;
+  }
+
+  return <main className="split"><header><div><p className="eyebrow">STEP 2 OF 3</p><h1>Mark question starts</h1></div><div><button type="button" className="secondary" onClick={onBack}>Start over</button><button type="button" onClick={createSplitPreview} disabled={clicks.length === 0}>Preview split</button></div></header><section><aside><p>Click once where each new question begins. The next click ends the previous question. Then preview the crops before grading.</p>{session.page_paths.map((_, index) => <button type="button" key={index} className={index === page ? "tab selected" : "tab"} onClick={() => setPage(index)}>Page {index + 1}<small>{clicks.filter((point) => point.page_index === index).length} starts</small></button>)}<button type="button" className="secondary wide" onClick={() => setClicks((all) => renumber(all.filter((point) => point.page_index !== page)))}>Clear this page</button><button type="button" className="secondary wide" onClick={() => setClicks((all) => renumber(all.slice(0, -1)))}>Undo last mark</button><div className="status" style={{ color: "#d9e8fb" }}>Questions marked: {clicks.length}</div>{status && <p className="status">{status}</p>}</aside><div className="stage"><div className="canvas" onClick={mark}><img src={image} onLoad={(e) => setHeight(e.currentTarget.naturalHeight)} />{height > 0 && marks.map((point) => <i key={`${point.question_index}-${point.page_index}-${point.y}`} style={{ top: `${point.y / height * 100}%` }}>Q{point.question_index}</i>)}</div></div></section></main>;
 }
 
 function Results({ result, reset }) {
