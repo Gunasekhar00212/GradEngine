@@ -30,8 +30,8 @@ class AnnotationClick(BaseModel):
 	"""Store a teacher click on a page image."""
 
 	page_index: int
-	x: int
 	y: int
+	question_index: int
 
 
 class DiagramItem(BaseModel):

@@ -182,27 +182,22 @@ def split_session(session_id: str) -> dict[str, Any]:
 
 	question_dir = PATHS.question_crops_dir / session_id
 	all_boundaries: list[dict[str, Any]] = []
-	session_boundaries = []
 	question_paths: list[str] = []
+	session_boundaries = []
 
-	for page_index, page_path in enumerate(session.page_paths):
-		page_image = Path(page_path)
-		if session.mode == "manual":
-			annotation_path = PATHS.upload_dir / session_id / "manual_clicks.json"
-			page_height = 0
-			try:
-				from PIL import Image
-
-				page_height = Image.open(page_image).size[1]
-			except Exception:
-				page_height = 1800
-			boundaries = split_service.load_manual_boundaries(annotation_path, page_index, page_height)
-		else:
+	if session.mode == "manual":
+		annotation_path = PATHS.upload_dir / session_id / "manual_clicks.json"
+		clicks = split_service.load_manual_clicks(annotation_path)
+		groups = split_service.group_pages_by_question(clicks, len(session.page_paths))
+		for group in groups:
+			question_paths.append(split_service.crop_question_image(group, session.page_paths, question_dir))
+			all_boundaries.append(group)
+	else:
+		for page_index, page_path in enumerate(session.page_paths):
 			boundaries = split_service.auto_detect_boundaries(page_path, page_index)
-
-		question_paths.extend(split_service.crop_questions(page_path, boundaries, question_dir, page_index))
-		session_boundaries.extend(boundaries)
-		all_boundaries.extend([boundary.model_dump() for boundary in boundaries])
+			question_paths.extend(split_service.crop_questions(page_path, boundaries, question_dir, page_index))
+			session_boundaries.extend(boundaries)
+			all_boundaries.extend([boundary.model_dump() for boundary in boundaries])
 
 	session.boundaries = session_boundaries
 	session.question_paths = question_paths

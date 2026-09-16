@@ -24,19 +24,20 @@ function Upload({ onUploaded }) {
       onUploaded(await api(`/api/sessions/${upload.session_id}`));
     } catch (error) { setStatus(error.message); }
   }
-  return <main className="landing"><form className="card upload" onSubmit={submit}><p className="eyebrow">GRADEENGINE</p><h1>Upload an answer sheet.</h1><p>Next, you will mark question boundaries across the full rendered pages.</p><label>Student PDF<input type="file" accept="application/pdf" onChange={(e) => setStudent(e.target.files?.[0])} /></label><label>Rubric JSON<input type="file" accept="application/json" onChange={(e) => setRubric(e.target.files?.[0])} /></label>{status && <p className="status">{status}</p>}<button>Continue to splitting</button></form></main>;
+  return <main className="landing"><form className="card upload" onSubmit={submit}><p className="eyebrow">GRADEENGINE</p><h1>Upload an answer sheet.</h1><p>Next, you will click each question start across the rendered pages.</p><label>Student PDF<input type="file" accept="application/pdf" onChange={(e) => setStudent(e.target.files?.[0])} /></label><label>Rubric JSON<input type="file" accept="application/json" onChange={(e) => setRubric(e.target.files?.[0])} /></label>{status && <p className="status">{status}</p>}<button>Continue to splitting</button></form></main>;
 }
 
 function Split({ session, onComplete, onBack }) {
   const [page, setPage] = useState(0), [clicks, setClicks] = useState([]), [height, setHeight] = useState(0), [status, setStatus] = useState("");
   const marks = clicks.filter((click) => click.page_index === page);
   const image = `/api/sessions/${session.session_id}/pages/${page}`;
-  function mark(event) { if (!height) return; const box = event.currentTarget.getBoundingClientRect(); setClicks((all) => [...all, { page_index: page, x: 0, y: Math.round((event.clientY - box.top) / box.height * height) }]); }
+  function renumber(all) { return all.map((click, index) => ({ ...click, question_index: index + 1 })); }
+  function mark(event) { if (!height) return; const box = event.currentTarget.getBoundingClientRect(); setClicks((all) => renumber([...all, { page_index: page, y: Math.round((event.clientY - box.top) / box.height * height), question_index: all.length + 1 }])); }
   async function finish() {
     try {
-      setStatus("Saving split annotations…");
+      setStatus("Saving question starts…");
       await api(`/api/sessions/${session.session_id}/manual-clicks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(clicks) });
-      setStatus("Cropping question regions…");
+      setStatus("Cropping question images…");
       await api(`/api/sessions/${session.session_id}/split`, { method: "POST" });
       setStatus("Reading handwriting with OCR…");
       await api(`/api/sessions/${session.session_id}/extract`, { method: "POST" });
@@ -45,7 +46,7 @@ function Split({ session, onComplete, onBack }) {
       setStatus("");
     } catch (error) { setStatus(error.message); }
   }
-  return <main className="split"><header><div><p className="eyebrow">STEP 2 OF 3</p><h1>Mark question boundaries</h1></div><div><button type="button" className="secondary" onClick={onBack}>Start over</button><button type="button" onClick={finish}>Finish and grade</button></div></header><section><aside><p>Click where a new question begins. A red line marks the split.</p>{session.page_paths.map((_, index) => <button type="button" key={index} className={index === page ? "tab selected" : "tab"} onClick={() => setPage(index)}>Page {index + 1}<small>{clicks.filter((point) => point.page_index === index).length} marks</small></button>)}<button type="button" className="secondary wide" onClick={() => setClicks((all) => all.filter((point) => point.page_index !== page))}>Clear this page</button><button type="button" className="secondary wide" onClick={() => setClicks((all) => all.slice(0, -1))}>Undo last mark</button>{status && <p className="status">{status}</p>}</aside><div className="stage"><div className="canvas" onClick={mark}><img src={image} onLoad={(e) => setHeight(e.currentTarget.naturalHeight)} />{height > 0 && marks.map((point, index) => <i key={`${point.y}-${index}`} style={{ top: `${point.y / height * 100}%` }}>Split {index + 1}</i>)}</div></div></section></main>;
+  return <main className="split"><header><div><p className="eyebrow">STEP 2 OF 3</p><h1>Mark question starts</h1></div><div><button type="button" className="secondary" onClick={onBack}>Start over</button><button type="button" onClick={finish}>Finish and grade</button></div></header><section><aside><p>Click once where each new question begins. The next click ends the previous question.</p>{session.page_paths.map((_, index) => <button type="button" key={index} className={index === page ? "tab selected" : "tab"} onClick={() => setPage(index)}>Page {index + 1}<small>{clicks.filter((point) => point.page_index === index).length} starts</small></button>)}<button type="button" className="secondary wide" onClick={() => setClicks((all) => renumber(all.filter((point) => point.page_index !== page)))}>Clear this page</button><button type="button" className="secondary wide" onClick={() => setClicks((all) => renumber(all.slice(0, -1)))}>Undo last mark</button><div className="status" style={{ color: "#d9e8fb" }}>Questions marked: {clicks.length}</div>{status && <p className="status">{status}</p>}</aside><div className="stage"><div className="canvas" onClick={mark}><img src={image} onLoad={(e) => setHeight(e.currentTarget.naturalHeight)} />{height > 0 && marks.map((point) => <i key={`${point.question_index}-${point.page_index}-${point.y}`} style={{ top: `${point.y / height * 100}%` }}>Q{point.question_index}</i>)}</div></div></section></main>;
 }
 
 function Results({ result, reset }) {

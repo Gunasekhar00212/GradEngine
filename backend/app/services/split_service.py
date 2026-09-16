@@ -15,6 +15,33 @@ from backend.app.utils.image_utils import crop_image
 class SplitService:
     """Store page boundaries and crop question images from a page."""
 
+    def group_pages_by_question(self, clicks: list[AnnotationClick], num_pages: int) -> list[dict[str, int | None]]:
+        """Convert teacher question-start clicks into page spans."""
+
+        ordered_clicks = sorted(clicks, key=lambda click: click.question_index)
+        groups: list[dict[str, int | None]] = []
+
+        for index, click in enumerate(ordered_clicks):
+            if index + 1 < len(ordered_clicks):
+                next_click = ordered_clicks[index + 1]
+                end_page = next_click.page_index
+                end_y: int | None = next_click.y
+            else:
+                end_page = max(0, num_pages - 1)
+                end_y = None
+
+            groups.append(
+                {
+                    "question_index": click.question_index,
+                    "start_page": click.page_index,
+                    "start_y": click.y,
+                    "end_page": end_page,
+                    "end_y": end_y,
+                }
+            )
+
+        return groups
+
     def auto_detect_boundaries(self, page_path: str | Path, page_index: int = 0) -> list[PageBoundary]:
         """Use a simple whitespace and line-density heuristic to find question starts."""
 
@@ -54,6 +81,15 @@ class SplitService:
         write_json(Path(output_path), payload)
         return payload
 
+    def load_manual_clicks(self, annotation_path: str | Path) -> list[AnnotationClick]:
+        """Load teacher question-start clicks from disk."""
+
+        path = Path(annotation_path)
+        if not path.exists():
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return [AnnotationClick(**item) for item in data]
+
     def load_manual_boundaries(self, annotation_path: str | Path, page_index: int, page_height: int) -> list[PageBoundary]:
         """Convert teacher clicks into page ranges for a simple manual split."""
 
@@ -74,6 +110,48 @@ class SplitService:
                 start_y = y
         boundaries.append(PageBoundary(page_index=page_index, start_y=start_y, end_y=page_height, source="manual"))
         return boundaries
+
+    def crop_question_image(
+        self,
+        group: dict[str, int | None],
+        page_paths: list[str],
+        output_dir: str | Path,
+    ) -> str:
+        """Crop and merge all slices that belong to one question."""
+
+        output = Path(output_dir)
+        output.mkdir(parents=True, exist_ok=True)
+        start_page = int(group["start_page"] or 0)
+        end_page = int(group["end_page"] or start_page)
+        end_y = group["end_y"]
+        slices: list[Image.Image] = []
+
+        for page_index in range(start_page, end_page + 1):
+            with Image.open(page_paths[page_index]) as image:
+                rgb_image = image.convert("RGB")
+                width, height = rgb_image.size
+                top = int(group["start_y"] or 0) if page_index == start_page else 0
+                bottom = int(end_y) if page_index == end_page and end_y is not None else height
+                if bottom <= top:
+                    bottom = min(height, top + 1)
+                slices.append(rgb_image.crop((0, top, width, bottom)))
+
+        target = output / f"q{int(group['question_index'] or 0)}.png"
+        if not slices:
+            return str(target)
+        if len(slices) == 1:
+            slices[0].save(target)
+            return str(target)
+
+        merged_width = max(image.width for image in slices)
+        merged_height = sum(image.height for image in slices)
+        canvas = Image.new("RGB", (merged_width, merged_height), "white")
+        y_offset = 0
+        for slice_image in slices:
+            canvas.paste(slice_image, (0, y_offset))
+            y_offset += slice_image.height
+        canvas.save(target)
+        return str(target)
 
     def crop_questions(
         self,

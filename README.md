@@ -122,7 +122,7 @@ export GEMINI_API_KEY="your-key"
 ```
 
 `GEMINI_OCR_MODEL` and `GEMINI_EVALUATION_MODEL` are optional and default to
-`gemini-2.5-flash`.
+`gemini-3.5-flash`.
 
 2. Start the app.
 
