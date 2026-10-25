@@ -11,7 +11,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/Gunasekhar00212/GradEngine">
-    <img src="images/logo.svg" alt="Logo" width="96" height="96">
+    <img src="./images/logo.svg" alt="Logo" width="96" height="96">
   </a>
 
   <h3 align="center">AI Based Handwritten Answer Evaluation Framework</h3>
@@ -65,7 +65,7 @@
 ## About The Project
 
 <p align="center">
-  <img src="images/architecture.svg" alt="System architecture: React frontend, FastAPI backend, PostgreSQL, SQLite checkpoints, local uploads and Google Gemini" width="100%">
+  <img src="./images/architecture.svg" alt="System architecture: React frontend, FastAPI backend, PostgreSQL, SQLite checkpoints, local uploads and Google Gemini" width="100%">
 </p>
 
 <!--
@@ -92,7 +92,7 @@ Nothing is final until a teaching assistant (TA) has reviewed it. The AI does th
 ### How It Works
 
 <p align="center">
-  <img src="images/workflow.svg" alt="Grading workflow from PDF upload to final score with TA review and plagiarism check" width="100%">
+  <img src="./images/workflow.svg" alt="Grading workflow from PDF upload to final score with TA review and plagiarism check" width="100%">
 </p>
 
 1. The instructor creates an exam with a JSON rubric and uploads one PDF per student. The file name (without extension) becomes the student roll number.
