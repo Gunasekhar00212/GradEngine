@@ -1,56 +1,9 @@
-# -------------------------
-# Environment variables
-# -------------------------
 .env
-
-# -------------------------
-# Python cache
-# -------------------------
-__pycache__/
-*.pyc
-
-# -------------------------
-# Virtual environment
-# -------------------------
-venv/
-env/
-
-# -------------------------
-# OS files
-# -------------------------
+.env.local
+.env.*.local
 .DS_Store
-
-# -------------------------
-# Generated data (optional)
-# -------------------------
-data/input/
-data/pages/
-data/crops/
-data/question_crops/
-data/text/
-data/diagrams/
-data/equations/
-data/answer_json/
-data/rubric_json/
-data/evaluations/
-data/reliability/
-data/reports/
-data/extracted_text/
-data/extracted/
-data/vectors/
-data/uploads/
-data/outputs/
-
-# -------------------------
-# App cache and generated UI files
-# -------------------------
-app/__pycache__/
-app/**/__pycache__/
-
-# -------------------------
-# Logs
-# -------------------------
-*.log
-
-frontend/node_modules/
-frontend/dist/
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
