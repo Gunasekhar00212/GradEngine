@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="360" viewBox="0 0 1160 360" font-family="Segoe UI, Helvetica, Arial, sans-serif" role="img" aria-label="Grading workflow from PDF upload to final score with TA review and plagiarism check">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b45309"/>
+    </marker>
+  </defs>
+  <rect width="1160" height="360" rx="16" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="580" y="38" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">Grading workflow: from scanned script to reviewed score</text>
+
+  <!-- step boxes -->
+  <g font-size="12" text-anchor="middle" fill="#0f172a">
+    <rect x="20" y="70" width="135" height="96" rx="10" fill="#eff6ff" stroke="#2563eb"/>
+    <text x="87" y="96" font-size="13" font-weight="700">1. Upload</text>
+    <text x="87" y="118">Instructor adds</text><text x="87" y="134">rubric JSON + PDFs</text>
+
+    <rect x="180" y="70" width="135" height="96" rx="10" fill="#eff6ff" stroke="#2563eb"/>
+    <text x="247" y="96" font-size="13" font-weight="700">2. Rasterize</text>
+    <text x="247" y="118">PyMuPDF renders</text><text x="247" y="134">page PNGs, 150 DPI</text>
+
+    <rect x="340" y="70" width="135" height="96" rx="10" fill="#f5f3ff" stroke="#7c3aed"/>
+    <text x="407" y="96" font-size="13" font-weight="700">3. OCR</text>
+    <text x="407" y="118">Gemini vision to</text><text x="407" y="134">Markdown + LaTeX</text>
+
+    <rect x="500" y="70" width="135" height="96" rx="10" fill="#f5f3ff" stroke="#7c3aed"/>
+    <text x="567" y="96" font-size="13" font-weight="700">4. Grade</text>
+    <text x="567" y="118">Structured output</text><text x="567" y="134">against the rubric</text>
+
+    <rect x="660" y="70" width="135" height="96" rx="10" fill="#f0fdf4" stroke="#16a34a"/>
+    <text x="727" y="96" font-size="13" font-weight="700">5. Metrics + ML</text>
+    <text x="727" y="118">13 reliability features</text><text x="727" y="134">RandomForest advice</text>
+
+    <rect x="820" y="70" width="150" height="96" rx="10" fill="#fff7ed" stroke="#ea580c"/>
+    <text x="895" y="96" font-size="13" font-weight="700">6. TA review</text>
+    <text x="895" y="118">Approve, override or</text><text x="895" y="134">flag (graph paused)</text>
+
+    <rect x="995" y="70" width="145" height="96" rx="10" fill="#ecfdf5" stroke="#059669"/>
+    <text x="1067" y="96" font-size="13" font-weight="700">7. Final score</text>
+    <text x="1067" y="118">Graph resumes, total</text><text x="1067" y="134">saved in PostgreSQL</text>
+  </g>
+
+  <!-- arrows between steps -->
+  <g stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <line x1="155" y1="118" x2="178" y2="118"/>
+    <line x1="315" y1="118" x2="338" y2="118"/>
+    <line x1="475" y1="118" x2="498" y2="118"/>
+    <line x1="635" y1="118" x2="658" y2="118"/>
+    <line x1="795" y1="118" x2="818" y2="118"/>
+    <line x1="970" y1="118" x2="993" y2="118"/>
+  </g>
+
+  <!-- background-task bracket -->
+  <path d="M180 186 L180 196 L795 196 L795 186" fill="none" stroke="#94a3b8" stroke-width="2"/>
+  <text x="487" y="216" text-anchor="middle" font-size="12" fill="#475569">Steps 3 to 5 run as one LangGraph workflow in a background task; state is checkpointed in SQLite</text>
+
+  <!-- plagiarism box -->
+  <rect x="180" y="248" width="640" height="84" rx="10" fill="#fffbeb" stroke="#b45309" stroke-dasharray="6 4"/>
+  <text x="500" y="272" text-anchor="middle" font-size="13" font-weight="700" fill="#92400e">Collusion screening (once all scripts of an exam are processed)</text>
+  <text x="500" y="296" text-anchor="middle" font-size="12" fill="#0f172a">Embed each answer, keep pairs with cosine similarity above 0.85,</text>
+  <text x="500" y="314" text-anchor="middle" font-size="12" fill="#0f172a">let an LLM judge copying vs independent work, save plagiarism.json</text>
+  <path d="M820 290 L895 290 L895 168" fill="none" stroke="#b45309" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowD)"/>
+  <text x="905" y="250" font-size="12" fill="#92400e">similarity flags</text>
+  <text x="905" y="266" font-size="12" fill="#92400e">shown to the TA</text>
+</svg>
