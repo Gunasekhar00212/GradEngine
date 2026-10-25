@@ -49,6 +49,7 @@ async def login(
         secure=COOKIE_SECURE,
         samesite="lax",
         max_age=cookie_max_age,
+        domain=None,
     )
 
     return {"message": "Login successful!"}

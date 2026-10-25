@@ -31,6 +31,11 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)):
 
     token = request.cookies.get("access_token")
     if token is None:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1]
+
+    if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
