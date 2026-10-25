@@ -1,1 +1,0 @@
-"""Backend OCR wrapper package."""

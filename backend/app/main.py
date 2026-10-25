@@ -1,26 +1,38 @@
-"""FastAPI application entrypoint for the GradEngine backend package."""
+import socket
 
-from __future__ import annotations
+# Prefer IPv4 to avoid IPv6 route blackholing/timeouts on Google API calls
+_orig_getaddrinfo = socket.getaddrinfo
+def _getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
+    return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+socket.getaddrinfo = _getaddrinfo_ipv4
 
+from dotenv import load_dotenv
+
+load_dotenv()
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from routers import exams, login, register, submissions, users
+from app.database import engine
+from app import models
 
-from backend.app.api.routes import router
-from backend.app.core.config import PATHS, ensure_workspace_dirs
+models.Base.metadata.create_all(bind=engine)
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(exams.router)
+app.include_router(register.router)
+app.include_router(login.router)
+app.include_router(submissions.router)
+app.include_router(users.router)
 
 
-def create_app() -> FastAPI:
-	"""Create the API app and register routes."""
-
-	ensure_workspace_dirs()
-	app = FastAPI(title="GradEngine Prototype", version="0.1.0")
-	assets_dir = PATHS.frontend_dist_dir / "assets"
-	if assets_dir.is_dir():
-		app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
-	app.include_router(router)
-	return app
-
-
-app = create_app()
-
-__all__ = ["app", "create_app"]
+@app.get("/")
+async def root():
+    return {"Message": "Welcome to my API!"}

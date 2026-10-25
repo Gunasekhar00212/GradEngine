@@ -1,1 +1,0 @@
-"""Backend diagram wrapper package."""

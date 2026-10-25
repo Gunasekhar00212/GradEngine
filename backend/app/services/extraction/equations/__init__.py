@@ -1,1 +1,0 @@
-"""Backend equation wrapper package."""
